@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <fstream>
 
 #include "bencode_decoder.h"
 
@@ -29,6 +30,18 @@ int main(int argc, char *argv[])
 		std::string encoded_value = argv[2];
 		json decoded_value = Decoder::decode_bencoded_value(encoded_value);
 		std::cout << decoded_value.dump() << std::endl;
+	}
+	else if (command == "info")
+	{
+		std::string filename = argv[2];
+		std::ifstream file(filename);
+		std::ostringstream sstr;
+		
+		sstr << file.rdbuf();
+		json decoded_data = Decoder::decode_bencoded_value(sstr.str());
+
+		std::cout << "Tracker URL: " << decoded_data["announce"].get<std::string>() << std::endl;
+		std::cout << "Length: " << decoded_data["info"]["length"].get<int>() << std::endl;
 	}
 	else
 	{
