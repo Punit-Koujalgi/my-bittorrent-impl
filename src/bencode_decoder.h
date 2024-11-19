@@ -15,10 +15,14 @@ using json = nlohmann::json;
 namespace Decoder
 {
 	json decode_bencoded_value(const std::string &encoded_value);
+	
+	json decode_bencoded_value(const std::string &encoded_value, size_t& position);
 
-	json decode_bencoded_string(const std::string &encoded_value);
+	json decode_bencoded_string(const std::string &encoded_value, size_t& position);
 
-	json decode_bencoded_int(const std::string &encoded_value);
+	json decode_bencoded_int(const std::string &encoded_value, size_t& position);
+
+	json decode_bencoded_list(const std::string &encoded_value, size_t& position);
 }
 
 
