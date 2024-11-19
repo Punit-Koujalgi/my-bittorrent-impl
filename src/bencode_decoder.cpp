@@ -13,7 +13,7 @@ namespace Decoder
 		}
 		catch(const std::exception& e)
 		{
-			std::cerr << "Failed to decode string: []" << encoded_value << "]\n";
+			std::cerr << "Failed to decode string: [" << encoded_value << "]\n";
 		}
 
 		return json();
@@ -32,6 +32,10 @@ namespace Decoder
 		else if(encoded_value[position] == 'l')
 		{
 			return decode_bencoded_list(encoded_value, position);
+		}
+		else if(encoded_value[position] == 'd')
+		{
+			return decode_bencoded_dict(encoded_value, position);
 		}
 		else
 		{
@@ -94,6 +98,23 @@ namespace Decoder
 
 		++position; // 'e'
 		return list;
+	}
+
+	json decode_bencoded_dict(const std::string &encoded_value, size_t& position)
+	{
+		++position; // 'd'
+
+		json obj = json::object();
+		while (encoded_value[position] != 'e')
+		{
+			json key = decode_bencoded_value(encoded_value, position);
+			json value = decode_bencoded_value(encoded_value, position);
+
+			obj[key] = value;
+		}
+
+		++position; // 'e'
+		return obj;
 	}
 
 }
