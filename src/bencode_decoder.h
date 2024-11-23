@@ -26,6 +26,8 @@ namespace Decoder
 	json decode_bencoded_list(const std::string &encoded_value, size_t& position);
 
 	json decode_bencoded_dict(const std::string &encoded_value, size_t& position);
+
+	std::vector<std::string> get_pieces_list_from_json(const json& j);
 }
 
 namespace Encoder
@@ -33,6 +35,7 @@ namespace Encoder
 	std::string json_to_bencode(const json& j);
 
 	std::string SHA_string(const std::string& data);
+
 }
 
 

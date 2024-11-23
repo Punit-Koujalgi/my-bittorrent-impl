@@ -117,6 +117,28 @@ namespace Decoder
 		return obj;
 	}
 
+	std::vector<std::string> get_pieces_list_from_json(const json& j)
+	{
+		auto hashes_str = j.get<std::string>();
+		std::string_view hashes_str_view (hashes_str);
+		std::vector<std::string> hash_list;
+		
+		while (hashes_str_view.length() > 0)
+		{
+			auto piece_hash = hashes_str_view.substr(0, 20);
+			hashes_str_view = hashes_str_view.substr(20);
+
+			std::stringstream ss;
+
+			for (unsigned char byte : piece_hash)
+				ss << std::hex << std::setw(2) << std::setfill('0') <<static_cast<int>(byte);
+
+			hash_list.push_back(std::move(ss.str()));
+		}
+
+		return hash_list;
+	}
+
 }
 
 namespace Encoder
@@ -169,5 +191,6 @@ namespace Encoder
 
 		return ss.str();
 	}
+
 }
 

@@ -52,6 +52,12 @@ int main(int argc, char *argv[])
 		std::cout << "Tracker URL: " << decoded_data["announce"].get<std::string>() << std::endl;
 		std::cout << "Length: " << decoded_data["info"]["length"].get<int>() << std::endl;
 		std::cout << "Info Hash: " << info_hash << std::endl;
+		std::cout << "Piece Length: " << decoded_data["info"]["piece length"].get<int>() << std::endl;
+		std::cout << "Piece Hashes: " << std::endl;
+
+		auto piece_hashes = Decoder::get_pieces_list_from_json(decoded_data["info"]["pieces"]);
+		for (const auto& hash : piece_hashes)
+			std::cout << hash << std::endl;
 	}
 	else
 	{

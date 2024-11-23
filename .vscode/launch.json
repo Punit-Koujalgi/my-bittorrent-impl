@@ -9,7 +9,7 @@
 			"type": "cppdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/build/bittorrent",
-			"args": ["decode", "l5:helloi52ee"],
+			"args": ["info", "/home/punit/Desktop/MyProjects/my-bit-torrent/sample.torrent"],
 			"stopAtEntry": false,
 			"environment": [],
 			"cwd": "${workspaceFolder}",
