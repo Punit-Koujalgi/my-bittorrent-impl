@@ -119,3 +119,55 @@ namespace Decoder
 
 }
 
+namespace Encoder
+{
+	std::string json_to_bencode(const json& j)
+	{
+		std::ostringstream os;
+
+		if (j.is_object())
+		{
+			os << 'd';
+
+			for (auto& kv : j.items())
+				os << kv.key().size() << ':' << kv.key() << json_to_bencode(kv.value());
+
+			os << 'e';
+		}
+		else if (j.is_array())
+		{
+			os << 'l';
+
+			for (auto& item : j)
+				os << json_to_bencode(item);
+
+			os << 'e';
+		}
+		else if (j.is_number_integer())
+		{
+			os << 'i' << j.get<int>() << 'e';
+		}
+		else if (j.is_string())
+		{
+			const auto& str = j.get<std::string>();
+			os << str.size() << ':' << str;
+		}
+
+		return os.str();
+	}
+
+	std::string SHA_string(const std::string& data)
+	{
+		unsigned char hash[20];
+		SHA1((unsigned char*)data.c_str(), data.size(), hash);
+
+		std::stringstream ss;
+		ss << std::hex << std::setfill('0');
+
+		for (const auto& byte : hash)
+			ss << std::setw(2) << static_cast<int>(byte);
+
+		return ss.str();
+	}
+}
+
