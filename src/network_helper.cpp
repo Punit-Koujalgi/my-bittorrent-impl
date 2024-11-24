@@ -34,7 +34,7 @@ namespace Network
 						static_cast<UCHAR>(peer[1]),
 						static_cast<UCHAR>(peer[2]),
 						static_cast<UCHAR>(peer[3]),
-						(static_cast<unsigned short>(peer[4] << 8) | static_cast<unsigned short>(peer[5]))));
+						(static_cast<unsigned short>(peer[4] << 8) | static_cast<unsigned char>(peer[5]))));
 		}
 
 		return peers;
