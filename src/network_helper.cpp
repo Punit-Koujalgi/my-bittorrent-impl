@@ -2,6 +2,13 @@
 #include "network_helper.h"
 #include "lib/http/httplib.h"
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#define BITTORRENT_PROTOCOL "BitTorrent protocol"
+#define PEER_ID "PUNITKOUJAPAVANKOUJA"
+
 namespace Network
 {
 	Peer::Peer(UCHAR u1, UCHAR u2, UCHAR u3, UCHAR u4, unsigned short port)
@@ -43,7 +50,7 @@ namespace Network
 	std::vector<Peer> get_peers(const Torrent::TorrentData& torrent_data)
 	{
 		httplib::Params params{
-			{"peer_id", "00112233445566778899"},
+			{"peer_id", PEER_ID},
 			{"port", "6881"},
 			{"uploaded", "0"},
 			{"downloaded", "0"},
@@ -71,6 +78,93 @@ namespace Network
 		std::cerr << "Tracker request failed with err: " << resp_json["failure reason"].get<std::string>() << std::endl;
 		return std::vector<Peer>();
 		
+	}
+
+	void prepare_handshake(const std::string& hashinfo, std::string& handShake)
+	{
+		char protocolLength = 19;
+		handShake.push_back(protocolLength);
+
+		std::string protocol = BITTORRENT_PROTOCOL;
+		handShake.insert(handShake.end(), protocol.begin(), protocol.end());
+		//eight reserved bytes
+		for (int i = 0; i < 8 ; ++i)
+			handShake.push_back(0);
+
+		handShake.insert(handShake.end(), hashinfo.begin(), hashinfo.end());
+		std::string peerId = PEER_ID;
+		handShake.insert(handShake.end(), peerId.begin(), peerId.end());
+	}
+
+
+	int connect_with_peer(const std::string& peer_addr_str)
+	{
+		std::string peer_ip = peer_addr_str.substr(0, peer_addr_str.find(':'));
+		int peer_port = std::stoi(peer_addr_str.substr(peer_addr_str.find(':') + 1));
+
+		int my_socket = socket(AF_INET, SOCK_STREAM, 0);
+		if (my_socket < 0)
+		{
+			std::cerr << "Failed to create socket" << std::endl;
+			return -1;
+		}
+
+		std::cout << "DEBUG: " << peer_ip << " " << peer_port << std::endl;
+
+		struct sockaddr_in peer_addr;
+		peer_addr.sin_family = AF_INET;
+		peer_addr.sin_port = htons(peer_port);
+
+		if (inet_pton(AF_INET, peer_ip.c_str(), &peer_addr.sin_addr) < 0)
+		{
+			std::cerr << "Invalid IP address" << std::endl;
+			return -1;
+		}
+		std::cout << "DEBUG 2: " << peer_ip << " " << peer_port << std::endl;
+		if (connect(my_socket, (struct sockaddr*)&peer_addr, sizeof(peer_addr)) < 0)
+		{
+			std::cerr << "Failed to connect to peer" << std::endl;
+			return -1;
+		}
+		std::cout << "DEBUG 3: " << peer_ip << " " << peer_port << std::endl;
+		return my_socket;
+	}
+
+	int receive_peer_id_with_handshake(const Torrent::TorrentData& torrent_data, const std::string& peer_addr_str, std::string& peer_id)
+	{
+		int my_socket = connect_with_peer(peer_addr_str);
+		if (my_socket < 0)
+		{
+			std::cerr << "Failed to connect to peer" << std::endl;
+			return -1;
+		}
+
+		std::string handshake_msg;
+		prepare_handshake(torrent_data.info_hash, handshake_msg);
+
+		std::cout << "DEBUG: sending msg: " << handshake_msg << std::endl;
+
+		if (send(my_socket, handshake_msg.data(), handshake_msg.size(), 0) < 0)
+		{
+			std::cerr << "Failed to send data to peer" << std::endl;
+			return -1;
+		}
+
+		std::string handshake_resp(handshake_msg.size(), 0);
+
+		if (recv(my_socket, handshake_resp.data(), handshake_resp.size(), 0) < 0)
+		{
+			std::cerr << "Failed to receive data from peer" << std::endl;
+			return -1;
+		}
+
+		if (!handshake_resp.empty())
+		{
+			peer_id.assign(handshake_resp.end() - 20, handshake_resp.end());			
+			return 0;
+		}
+
+		return -1;
 	}
 }
 

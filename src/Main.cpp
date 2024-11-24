@@ -67,6 +67,26 @@ int main(int argc, char *argv[])
 		for (auto peer : peers)
 			std::cout << peer.value() << std::endl;
 	}
+	else if (command == "handshake")
+	{
+		std::string filename = argv[2];
+		Torrent::TorrentData torrent_data;
+
+		if (Torrent::read_torrent_file(filename, torrent_data) != 0)
+		{
+			std::cerr << "Failed to read torrent file: " << filename << std::endl;
+			return 1;
+		}
+
+		std::string peer_id;
+		if (Network::receive_peer_id_with_handshake(torrent_data, argv[3], peer_id) != 0)
+		{
+			std::cerr << "Failed to receive peer id" << std::endl;
+			return 1;
+		}
+
+		std::cout << "Peer ID: " << Encoder::hast_to_hex(peer_id) << std::endl;
+	}
 	else
 	{
 		std::cerr << "unknown command: " << command << std::endl;

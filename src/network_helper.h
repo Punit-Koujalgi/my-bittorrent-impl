@@ -24,6 +24,12 @@ namespace Network
 
 	std::vector<Peer> process_peers_str(std::string&& encoded_peers);
 
+	void prepare_handshake(const std::string& hashinfo, std::string& handShake);
+
+	int connect_with_peer(const std::string& peer_addr);
+
+	int receive_peer_id_with_handshake(const Torrent::TorrentData& torrent_data, const std::string& peer_addr_str, std::string& peer_id);
+
 }
 
 #endif
