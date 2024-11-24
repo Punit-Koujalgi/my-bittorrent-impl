@@ -1,9 +1,9 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <fstream>
 
-#include "bencode_decoder.h"
+#include "bencode_helper.h"
+#include "network_helper.h"
 
 int main(int argc, char *argv[])
 {
@@ -34,30 +34,38 @@ int main(int argc, char *argv[])
 	else if (command == "info")
 	{
 		std::string filename = argv[2];
-		std::ifstream file(filename);
-		std::ostringstream sstr;
+		Torrent::TorrentData torrent_data;
+
+		if (Torrent::read_torrent_file(filename, torrent_data) != 0)
+		{
+			std::cerr << "Failed to read torrent file: " << filename << std::endl;
+			return 1;
+		}
 		
-		/* Note:
-			std::string can store any sequence of bytes, including those representing valid or invalid UTF-8 characters
-			How the string is interpreted depends on the context. Some functions might assume UTF-8 encoding, while others might treat it as raw bytes
-			If you need to ensure that a string contains valid UTF-8, you'll need to use additional functions or libraries
-		*/
-
-		sstr << file.rdbuf();
-		json decoded_data = Decoder::decode_bencoded_value(sstr.str());
-
-		std::string bencoded_info = Encoder::json_to_bencode(decoded_data["info"]);
-		std::string info_hash = Encoder::SHA_string(bencoded_info);
-
-		std::cout << "Tracker URL: " << decoded_data["announce"].get<std::string>() << std::endl;
-		std::cout << "Length: " << decoded_data["info"]["length"].get<int>() << std::endl;
-		std::cout << "Info Hash: " << info_hash << std::endl;
-		std::cout << "Piece Length: " << decoded_data["info"]["piece length"].get<int>() << std::endl;
+		std::cout << "Tracker URL: " << torrent_data.tracker << std::endl;
+		std::cout << "Length: " << torrent_data.length << std::endl;
+		std::cout << "Info Hash: " << Encoder::hast_to_hex(torrent_data.info_hash) << std::endl;
+		std::cout << "Piece Length: " << torrent_data.piece_length << std::endl;
 		std::cout << "Piece Hashes: " << std::endl;
 
-		auto piece_hashes = Decoder::get_pieces_list_from_json(decoded_data["info"]["pieces"]);
-		for (const auto& hash : piece_hashes)
+		for (const auto& hash : torrent_data.piece_hashes)
 			std::cout << hash << std::endl;
+	}
+	else if (command == "peers")
+	{
+		std::string filename = argv[2];
+		Torrent::TorrentData torrent_data;
+
+		if (Torrent::read_torrent_file(filename, torrent_data) != 0)
+		{
+			std::cerr << "Failed to read torrent file: " << filename << std::endl;
+			return 1;
+		}
+
+		auto peers = Network::get_peers(torrent_data);
+
+		for (auto peer : peers)
+			std::cout << peer.value() << std::endl;
 	}
 	else
 	{

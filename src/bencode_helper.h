@@ -1,6 +1,6 @@
 
-#ifndef _BENCODE_DECODER_H_
-#define _BENCODE_DECODER_H_
+#ifndef _BENCODE_HELPER_H_
+#define _BENCODE_HELPER_H_
 
 #include <iostream>
 #include <string>
@@ -36,6 +36,24 @@ namespace Encoder
 
 	std::string SHA_string(const std::string& data);
 
+	std::string hast_to_hex(const std::string& hash);
+
+	std::string encode_info_hash(const std::string& hash);
+
+}
+
+namespace Torrent
+{
+	struct TorrentData
+	{
+		std::string tracker;
+		int length = 0;
+		std::string info_hash;
+		int piece_length = 0;
+		std::vector<std::string> piece_hashes;
+	};
+
+	int read_torrent_file(const std::string& torrent_file, TorrentData& torrent_data);
 }
 
 

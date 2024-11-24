@@ -1,5 +1,7 @@
 
-#include "bencode_decoder.h"
+#include "bencode_helper.h"
+
+#include <fstream>
 
 namespace Decoder
 {
@@ -180,17 +182,59 @@ namespace Encoder
 
 	std::string SHA_string(const std::string& data)
 	{
-		unsigned char hash[20];
-		SHA1((unsigned char*)data.c_str(), data.size(), hash);
+		std::string hash(20, '\0');
+		SHA1((unsigned char*)data.c_str(), data.size(), (unsigned char*)hash.data());
 
+		return hash;
+	}
+
+	std::string hast_to_hex(const std::string& hash)
+	{
 		std::stringstream ss;
 		ss << std::hex << std::setfill('0');
 
-		for (const auto& byte : hash)
+		for (unsigned char byte : hash)
 			ss << std::setw(2) << static_cast<int>(byte);
 
 		return ss.str();
 	}
 
+	std::string encode_info_hash(const std::string& hash)
+	{
+		std::string encoded;
+		for(auto i = 0; i < hash.size(); i += 2)
+			encoded += '%' + hash.substr(i, 2);
+		return encoded;
+	}
+
+
 }
 
+namespace Torrent
+{
+	int read_torrent_file(const std::string& torrent_file, TorrentData& torrent_data)
+	{
+		std::ifstream file(torrent_file);
+		std::ostringstream sstr;
+		
+		/* Note:
+			std::string can store any sequence of bytes, including those representing valid or invalid UTF-8 characters
+			How the string is interpreted depends on the context. Some functions might assume UTF-8 encoding, while others might treat it as raw bytes
+			If you need to ensure that a string contains valid UTF-8, you'll need to use additional functions or libraries
+		*/
+
+		sstr << file.rdbuf();
+		json decoded_data = Decoder::decode_bencoded_value(sstr.str());
+
+		std::string bencoded_info = Encoder::json_to_bencode(decoded_data["info"]);
+		std::string info_hash = (bencoded_info);
+
+		torrent_data.tracker = decoded_data["announce"].get<std::string>();
+		torrent_data.length = decoded_data["info"]["length"].get<int>();
+		torrent_data.info_hash = std::move(Encoder::SHA_string(info_hash));
+		torrent_data.piece_length = decoded_data["info"]["piece length"].get<int>();
+		torrent_data.piece_hashes = std::move(Decoder::get_pieces_list_from_json(decoded_data["info"]["pieces"]));
+
+		return 0;
+	}
+}
