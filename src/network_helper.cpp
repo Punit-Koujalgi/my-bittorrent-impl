@@ -109,8 +109,6 @@ namespace Network
 			return -1;
 		}
 
-		std::cout << "DEBUG: " << peer_ip << " " << peer_port << std::endl;
-
 		struct sockaddr_in peer_addr;
 		peer_addr.sin_family = AF_INET;
 		peer_addr.sin_port = htons(peer_port);
@@ -120,13 +118,13 @@ namespace Network
 			std::cerr << "Invalid IP address" << std::endl;
 			return -1;
 		}
-		std::cout << "DEBUG 2: " << peer_ip << " " << peer_port << std::endl;
+
 		if (connect(my_socket, (struct sockaddr*)&peer_addr, sizeof(peer_addr)) < 0)
 		{
 			std::cerr << "Failed to connect to peer" << std::endl;
 			return -1;
 		}
-		std::cout << "DEBUG 3: " << peer_ip << " " << peer_port << std::endl;
+
 		return my_socket;
 	}
 
@@ -141,8 +139,6 @@ namespace Network
 
 		std::string handshake_msg;
 		prepare_handshake(torrent_data.info_hash, handshake_msg);
-
-		std::cout << "DEBUG: sending msg: " << handshake_msg << std::endl;
 
 		if (send(my_socket, handshake_msg.data(), handshake_msg.size(), 0) < 0)
 		{
