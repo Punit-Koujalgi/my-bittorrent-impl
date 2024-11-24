@@ -14,7 +14,7 @@ namespace Network
 		std::string ip_addr;
 		std::string port;
 
-		Peer(UCHAR u1, UCHAR u2, UCHAR u3, UCHAR u4, int port);
+		Peer(UCHAR u1, UCHAR u2, UCHAR u3, UCHAR u4, unsigned short port);
 		std::string value();
 	};
 

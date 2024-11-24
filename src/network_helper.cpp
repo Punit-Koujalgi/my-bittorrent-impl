@@ -4,7 +4,7 @@
 
 namespace Network
 {
-	Peer::Peer(UCHAR u1, UCHAR u2, UCHAR u3, UCHAR u4, int port)
+	Peer::Peer(UCHAR u1, UCHAR u2, UCHAR u3, UCHAR u4, unsigned short port)
 	{
 		this->ip_addr = std::to_string(u1) + '.' + std::to_string(u2) + '.' + std::to_string(u3) + '.' + std::to_string(u4);
 		this->port = std::to_string(port);
@@ -34,7 +34,7 @@ namespace Network
 						static_cast<UCHAR>(peer[1]),
 						static_cast<UCHAR>(peer[2]),
 						static_cast<UCHAR>(peer[3]),
-						(static_cast<unsigned short>(peer[4] << 8)) | static_cast<unsigned short>(peer[5])));
+						(static_cast<unsigned short>(peer[4] << 8) | static_cast<unsigned short>(peer[5]))));
 		}
 
 		return peers;
