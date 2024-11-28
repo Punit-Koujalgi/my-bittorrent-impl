@@ -15,12 +15,6 @@ namespace Downloader
 		std::string piece_data;
 	};
 
-	struct thread_arg
-	{
-		const Torrent::TorrentData* torrent_data;
-		int peer_index = 0; // also serves as thread id
-	};
-
 	enum message_type
 	{
 		CHOKE = 0,
@@ -38,9 +32,11 @@ namespace Downloader
 
 	int initialize_thread_pool(int pool_size, const Torrent::TorrentData &torrent_data);
 
-	void* thread_function(void* arg);
+	int wait_for_download(const Torrent::TorrentData &torrent_data);
 
-	void populate_work_queue(const Torrent::TorrentData& torrent_data);
+	void *thread_function(const Torrent::TorrentData* torrent_data, int peer_index);
+
+	void populate_work_queue(const Torrent::TorrentData& torrent_data, int piece_index);
 
 	void download_piece(const Torrent::TorrentData* torrent_data, Piece_Info& piece_info, int peer_index);
 
@@ -50,7 +46,7 @@ namespace Downloader
 
 	void handle_request_msgs(Piece_Info& piece, Network::Peer &peer);
 
-	void handle_piece_msgs(Piece_Info& piece, Network::Peer &peer);
+	void handle_piece_msgs(Piece_Info& piece, Network::Peer &peer, int expected_responses);
 
 	void verify_piece_hash(Piece_Info& piece);
 }

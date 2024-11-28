@@ -25,8 +25,13 @@ namespace Network
 		std::vector<uint8_t> vec_msg;
 		vec_msg.push_back(msg_type);
 
-		auto payload_size_bytes = Encoder::uint32_to_uint8(payload.size() > 0 ? payload.size() + 1 : 1);
+		if (payload.size() > 0)
+			vec_msg.insert(vec_msg.end(), payload.begin(), payload.end());
+
+		auto payload_size_bytes = Encoder::uint32_to_uint8(vec_msg.size());
 		vec_msg.insert(vec_msg.begin(), payload_size_bytes.begin(), payload_size_bytes.end());
+
+		std::cout << "DEBUG: total bytes:" << vec_msg.size() << "\n";
 
 		return std::string(vec_msg.begin(), vec_msg.end());
 	}
@@ -171,6 +176,8 @@ namespace Network
 			peer.peer_id.assign(handshake_resp.end() - 20, handshake_resp.end());			
 			peer.peer_socket = my_socket;
 
+			std::cout << "Successfully connected to peer: " << peer_addr_str << "\n";
+
 			return 0;
 		}
 
@@ -190,23 +197,26 @@ namespace Network
 			}
 		}
 
+		std::cout << "Sent [" << peer_msgs.size() << "] messages to peer\n";
 		peer_msgs.clear();
+
 		return 0;
 	}
 
-	int receive_peer_msgs(const int peer_socket, std::vector<Peer_Msg>& peer_msgs)
+	int receive_peer_msgs(const int peer_socket, std::vector<Peer_Msg>& peer_msgs, int expected_responses)
 	{
 		peer_msgs.clear();
+		int received_responses = 0;
 
-		while (true)
+		while (received_responses < expected_responses)
 		{
 			Peer_Msg peer_msg;
 
 			// receive total length bytes -> 4
 			std::string total_len_bytes(4, 0);
-			if (recv(peer_socket, total_len_bytes.data(), total_len_bytes.size(), 0) <= 0)
+			if (recv(peer_socket, total_len_bytes.data(), total_len_bytes.size(), 0) < 0)
 			{
-				std::cerr << "All responses received\n";
+				std::cerr << "Incorrect response received\n";
 				break; // so we can return with whatever msgs we received correctly
 			}
 
@@ -228,8 +238,10 @@ namespace Network
 			peer_msg.msg_type = actual_msg[0];
 
 			peer_msgs.push_back(peer_msg);
+			++received_responses;
 		}
 
+		std::cout << "Received [" << peer_msgs.size() << "] messages from peer\n";
 		return 0;
 	}
 }

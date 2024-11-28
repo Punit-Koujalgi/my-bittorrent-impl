@@ -52,7 +52,7 @@ namespace Network
 
 	int send_peer_msgs(const int peer_socket, std::vector<Peer_Msg>& peer_msgs);
 
-	int receive_peer_msgs(const int peer_socket, std::vector<Peer_Msg>& peer_msgs);
+	int receive_peer_msgs(const int peer_socket, std::vector<Peer_Msg>& peer_msgs, int expected_responses);
 
 }
 

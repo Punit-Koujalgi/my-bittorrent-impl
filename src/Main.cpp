@@ -4,6 +4,7 @@
 
 #include "bencode_helper.h"
 #include "network_helper.h"
+#include "downloader.h"
 
 int main(int argc, char *argv[])
 {
@@ -107,7 +108,12 @@ int main(int argc, char *argv[])
 		}
 
 		torrent_data.out_file = argv[3];
-		
+
+		if (Downloader::start_downloader(torrent_data, piece_index) != 0)
+		{
+			std::cerr << "Failed to download torrent file: " << torrent_file << std::endl;
+			return 1;
+		}
 	}
 	else
 	{

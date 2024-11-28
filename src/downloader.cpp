@@ -2,28 +2,43 @@
 #include "downloader.h"
 #include "network_helper.h"
 
-#include <pthread.h>
+#include <thread>
+#include <mutex>
 #include <algorithm>
 #include <queue>
+#include <fstream>
+#include <assert.h>
 
 #define BLOCK_SIZE_FOR_PIECE (16 * 1024)
 #define REQUEST_PIPELINE_LEN 5
 
 namespace Downloader
 {
-	std::vector<pthread_t> thread_pool;
+	std::vector<std::thread> thread_pool;
 	std::queue<Piece_Info> pieces_queue;
-	pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+	std::mutex queue_mutex;
+
+	class piece_comparator
+	{
+		public:
+			bool operator()(const Piece_Info& first, const Piece_Info& second)
+			{
+				return first.piece_index > second.piece_index; // swaps if false
+			}
+	};
+
+	std::priority_queue<Piece_Info, std::vector<Piece_Info>, piece_comparator> downloaded_piece_pq;
+	std::mutex pq_mutex;
 
 	int start_downloader(const Torrent::TorrentData &torrent_data, int piece_index)
 	{
-		populate_work_queue(torrent_data);
+		populate_work_queue(torrent_data, piece_index);
 
 		// determine thread pool size (each thread is a connection to a peer)
 		// pool_size = min(peers, pieces, threshold) else 1 if piece_index is provided
 		int pool_size = 0;
 
-		if (piece_index > 0)
+		if (piece_index >= 0)
 		{
 			pool_size = 1; // downloading a single piece
 		}
@@ -42,6 +57,8 @@ namespace Downloader
 			return -1;
 		}
 
+		wait_for_download(torrent_data);
+
 		return 0;
 	}
 
@@ -49,53 +66,42 @@ namespace Downloader
 	{
 		std::cout << "Creating threads in the pool..." << std::endl;
 
-		for (int i = 0; i < pool_size; ++i)
-		{
-			pthread_t new_thread;
-			thread_arg arg{&torrent_data, i};
-
-			if (pthread_create(&new_thread, NULL, thread_function, (void *)&arg) != 0)
-			{
-				std::cerr << "Failed to create thread!" << std::endl;
-				return -1;
-			}
-
-			thread_pool.push_back(new_thread);
-		}
+		for (int peer_index = 0; peer_index < pool_size; ++peer_index)
+			thread_pool.emplace_back(thread_function, &torrent_data, peer_index);
 
 		return 0;
 	}
 
-	void *thread_function(void *arg)
+	void *thread_function(const Torrent::TorrentData* torrent_data, int peer_index)
 	{
-		auto *torrent_data = ((thread_arg *)arg)->torrent_data;
-		auto peer_index = ((thread_arg *)arg)->peer_index; // it's also thread id
-
 		while (true)
 		{
-			pthread_mutex_lock(&queue_mutex);
-
+			std::unique_lock<std::mutex> lock(queue_mutex);
+			
 			if (pieces_queue.empty())
 				break;
 
 			auto piece_info = std::move(pieces_queue.front());
 			pieces_queue.pop();
 
-			pthread_mutex_unlock(&queue_mutex);
+			lock.unlock();
 
 			if (piece_info.downloaded_len < piece_info.piece_len)
 			{
 				try
 				{
 					download_piece(torrent_data, piece_info, peer_index);
+
+					std::unique_lock<std::mutex> lock(pq_mutex);
+					downloaded_piece_pq.push(std::move(piece_info));
 				}
 				catch (const std::exception& e)
 				{
-					std::cerr << "Failed to download piece " << piece_info.piece_index << "\n";
+					std::cerr << "Failed to download piece " << piece_info.piece_index << ". Err: " << e.what() << "\n";
 
-					pthread_mutex_lock(&queue_mutex);
+					std::unique_lock<std::mutex> lock(queue_mutex);
 					pieces_queue.push(piece_info);
-					pthread_mutex_unlock(&queue_mutex);
+					lock.unlock();
 				}
 			}
 		}
@@ -104,22 +110,45 @@ namespace Downloader
 		return nullptr;
 	}
 
-	void populate_work_queue(const Torrent::TorrentData &torrent_data)
+	int wait_for_download(const Torrent::TorrentData &torrent_data)
+	{
+
+		for (auto& thread : thread_pool)
+			thread.join();
+
+		// piece data together and write to file
+		std::ofstream output_file(torrent_data.out_file, std::ios::binary);
+		
+		while (!downloaded_piece_pq.empty())
+		{
+			auto piece = std::move(downloaded_piece_pq.top());
+			downloaded_piece_pq.pop();
+			output_file.write(piece.piece_data.c_str(), piece.piece_data.size());
+		}
+
+		output_file.close();
+		return 0;
+	}
+
+	void populate_work_queue(const Torrent::TorrentData &torrent_data, int piece_index)
 	{
 		int num_of_pieces = torrent_data.piece_hashes.size();
 		int piece_len = torrent_data.piece_length;
 
-		for (int piece_index = 0; piece_index < num_of_pieces; ++piece_index)
+		for (int curr_piece_index = 0; curr_piece_index < num_of_pieces; ++curr_piece_index)
 		{
 			Piece_Info piece;
 
-			piece.piece_index = piece_index;
+			piece.piece_index = curr_piece_index;
 			piece.piece_len = piece_len > BLOCK_SIZE_FOR_PIECE ? BLOCK_SIZE_FOR_PIECE : piece_len;
-			piece.piece_hash = torrent_data.piece_hashes[piece_index];
+			piece.piece_hash = torrent_data.piece_hashes[curr_piece_index];
+			piece_len -= piece.piece_len;
 
-			pieces_queue.push(std::move(piece));
+			if (piece_index < 0 || curr_piece_index == piece_index)
+				pieces_queue.push(std::move(piece));
 		}
 
+		assert(piece_len == 0);
 		std::cout << "Populated pieces work queue. Size: " << pieces_queue.size() << std::endl;
 	}
 
@@ -129,7 +158,7 @@ namespace Downloader
 		piece.downloaded_len = 0;
 		piece.piece_data.resize(piece.piece_len, '\0');
 
-		std::cout << "Downloading piece: " << piece.piece_index << " in Thread #" << piece.piece_index << "\n";
+		std::cout << "Downloading piece: " << piece.piece_index << " in Thread #" << peer_index << "\n";
 
 		auto peer = torrent_data->peers[peer_index];
 		if (Network::receive_peer_id_with_handshake(*torrent_data, peer.value(), peer) != 0)
@@ -151,7 +180,7 @@ namespace Downloader
 	void handle_bitfield_msg(int peer_socket)
 	{
 		std::vector<Network::Peer_Msg> peer_msgs;
-		Network::receive_peer_msgs(peer_socket, peer_msgs);
+		Network::receive_peer_msgs(peer_socket, peer_msgs, 1);
 
 		if (peer_msgs.size() != 1 && peer_msgs[0].msg_type != message_type::BITFIELD)
 			throw std::runtime_error("Expected bit field msg but got " + peer_msgs[0].msg_type);
@@ -167,7 +196,7 @@ namespace Downloader
 		if (Network::send_peer_msgs(peer_socket, peer_msgs) != 0)
 			throw std::runtime_error("Error when sending interested msg");
 
-		Network::receive_peer_msgs(peer_socket, peer_msgs);
+		Network::receive_peer_msgs(peer_socket, peer_msgs, 1);
 		if (peer_msgs.size() != 1 && peer_msgs[0].msg_type != message_type::UNCHOKE)
 			throw std::runtime_error("Error when receiving unchoke"); // try loop instead?
 	}
@@ -182,30 +211,35 @@ namespace Downloader
 			// construct payload for the msg
 			auto index_bytes = Encoder::uint32_to_uint8(piece.piece_index);
 			auto begin_bytes = Encoder::uint32_to_uint8(requests_sent * BLOCK_SIZE_FOR_PIECE);
-			auto length_bytes = Encoder::uint32_to_uint8(piece.piece_len - piece.downloaded_len < BLOCK_SIZE_FOR_PIECE ? piece.piece_len - piece.downloaded_len : BLOCK_SIZE_FOR_PIECE);
+			auto block_length = piece.piece_len - piece.downloaded_len < BLOCK_SIZE_FOR_PIECE ? piece.piece_len - piece.downloaded_len : BLOCK_SIZE_FOR_PIECE;
+			auto block_length_bytes = Encoder::uint32_to_uint8(block_length);
 
 			Network::Peer_Msg peer_msg;
 			peer_msg.msg_type = message_type::REQUEST;
 			peer_msg.payload.insert(peer_msg.payload.end(), index_bytes.begin(), index_bytes.end());
 			peer_msg.payload.insert(peer_msg.payload.end(), begin_bytes.begin(), begin_bytes.end());
-			peer_msg.payload.insert(peer_msg.payload.end(), length_bytes.begin(), length_bytes.end());
+			peer_msg.payload.insert(peer_msg.payload.end(), block_length_bytes.begin(), block_length_bytes.end());
 
 			peer_msgs.push_back(peer_msg);
+			piece.downloaded_len += block_length;
 
-			if (requests_sent != 0 && requests_sent % 5 == 0)
+			if ((requests_sent != 0 && requests_sent % 5 == 0) || piece.downloaded_len == piece.piece_len)
 			{
+				auto expected_responses = peer_msgs.size();
+				
 				if (Network::send_peer_msgs(peer.peer_socket, peer_msgs) != 0)
 					throw std::runtime_error("Failed to send peer msgs");
-				handle_piece_msgs(piece, peer);
+
+				handle_piece_msgs(piece, peer, expected_responses);
 			}
 		}
 	}
 
-	void handle_piece_msgs(Piece_Info &piece, Network::Peer &peer)
+	void handle_piece_msgs(Piece_Info &piece, Network::Peer &peer, int expected_responses)
 	{
 		std::vector<Network::Peer_Msg> peer_msgs;
 
-		if (Network::receive_peer_msgs(peer.peer_socket, peer_msgs) != 0)
+		if (Network::receive_peer_msgs(peer.peer_socket, peer_msgs, expected_responses) != 0)
 			throw std::runtime_error("Failed to receive peer msgs");
 
 		// process piece responses
@@ -233,6 +267,7 @@ namespace Downloader
 
 	void verify_piece_hash(Piece_Info &piece)
 	{
+		std::cout << "DEBUG: " << piece.piece_data << "\n";
 		// calculate hash of downloaded piece
 		std::string downloaded_data_hash = Encoder::hast_to_hex(Encoder::SHA_string(piece.piece_data));
 
