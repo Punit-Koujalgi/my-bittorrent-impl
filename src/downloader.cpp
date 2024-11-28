@@ -134,21 +134,22 @@ namespace Downloader
 	{
 		int num_of_pieces = torrent_data.piece_hashes.size();
 		int piece_len = torrent_data.piece_length;
+		int curr_total_len = torrent_data.length;
 
 		for (int curr_piece_index = 0; curr_piece_index < num_of_pieces; ++curr_piece_index)
 		{
 			Piece_Info piece;
 
 			piece.piece_index = curr_piece_index;
-			piece.piece_len = piece_len > BLOCK_SIZE_FOR_PIECE ? BLOCK_SIZE_FOR_PIECE : piece_len;
+			piece.piece_len = curr_total_len < piece_len ? curr_total_len : piece_len;
 			piece.piece_hash = torrent_data.piece_hashes[curr_piece_index];
-			piece_len -= piece.piece_len;
+			curr_total_len -= piece.piece_len;
 
 			if (piece_index < 0 || curr_piece_index == piece_index)
 				pieces_queue.push(std::move(piece));
 		}
 
-		assert(piece_len == 0);
+		assert(curr_total_len == 0);
 		std::cout << "Populated pieces work queue. Size: " << pieces_queue.size() << std::endl;
 	}
 
