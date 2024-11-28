@@ -69,6 +69,7 @@ namespace Downloader
 
 	int initialize_thread_pool(int pool_size, const Torrent::TorrentData &torrent_data)
 	{
+		pool_size = 1;
 		std::cout << "Creating " << pool_size << " threads in the pool..." << std::endl;
 
 		for (int peer_index = 0; peer_index < pool_size; ++peer_index)
