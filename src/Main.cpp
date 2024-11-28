@@ -88,18 +88,21 @@ int main(int argc, char *argv[])
 
 		std::cout << "Peer ID: " << Encoder::hast_to_hex(peer.peer_id) << std::endl;
 	}
-	else if (command == "download_piece")
+	else if (command == "download_piece" || command == "download")
 	{
-		if (argc < 6)
+		if ((command == "download_piece" && argc < 6) || (command == "download" && argc < 5))
 		{
-			std::cerr << "Redquired atleast 6 args for the command" << std::endl;
+			std::cerr << "Insufficient args for the command" << std::endl;
 			return 1;
 		}
 
 		Torrent::TorrentData torrent_data;
 
 		std::string torrent_file = argv[4];
-		int piece_index = std::stoi(argv[5]);
+
+		int piece_index = -1; // download all pieces
+		if (command == "download_piece")
+			piece_index = std::stoi(argv[5]);
 
 		if (Torrent::read_torrent_file(torrent_file, torrent_data) != 0)
 		{

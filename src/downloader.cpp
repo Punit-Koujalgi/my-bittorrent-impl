@@ -44,13 +44,15 @@ namespace Downloader
 		}
 		else
 		{
-			int pool_size = std::min(torrent_data.peers.size(), torrent_data.piece_hashes.size());
+			pool_size = std::min(torrent_data.peers.size(), torrent_data.piece_hashes.size());
 			int pool_threshold = 10;
 
 			if (pool_size > pool_threshold)
 				pool_size = pool_threshold;
 		}
 
+		auto start = std::chrono::high_resolution_clock::now();
+		
 		if (initialize_thread_pool(pool_size, torrent_data) != 0)
 		{
 			std::cerr << "Failed to initialize thread pool" << std::endl;
@@ -59,12 +61,15 @@ namespace Downloader
 
 		wait_for_download(torrent_data);
 
+		auto stop = std::chrono::high_resolution_clock::now();
+		std::cout << "Time taken for download: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << " ms\n";
+
 		return 0;
 	}
 
 	int initialize_thread_pool(int pool_size, const Torrent::TorrentData &torrent_data)
 	{
-		std::cout << "Creating threads in the pool..." << std::endl;
+		std::cout << "Creating " << pool_size << " threads in the pool..." << std::endl;
 
 		for (int peer_index = 0; peer_index < pool_size; ++peer_index)
 			thread_pool.emplace_back(thread_function, &torrent_data, peer_index);
@@ -106,7 +111,7 @@ namespace Downloader
 			}
 		}
 
-		std::cout << "Thread exiting...\n";
+		std::cout << "Thread #" << peer_index << " exiting...\n";
 		return nullptr;
 	}
 
@@ -200,6 +205,7 @@ namespace Downloader
 		Network::receive_peer_msgs(peer_socket, peer_msgs, 1);
 		if (peer_msgs.size() != 1 && peer_msgs[0].msg_type != message_type::UNCHOKE)
 			throw std::runtime_error("Error when receiving unchoke"); // try loop instead?
+
 	}
 
 	void handle_request_msgs(Piece_Info &piece, Network::Peer &peer)
@@ -264,18 +270,22 @@ namespace Downloader
 
 			uint32_t begin_byte = Encoder::uint8_to_uint32(peer_msg.payload[4], peer_msg.payload[5], peer_msg.payload[6], peer_msg.payload[7]);
 
-			piece.piece_data.insert(piece.piece_data.begin() + begin_byte, peer_msg.payload.begin() + 8, peer_msg.payload.end());
+			std::copy(peer_msg.payload.begin() + 8, peer_msg.payload.end(), piece.piece_data.begin() + begin_byte);
+			//piece.piece_data.insert(piece.piece_data.begin() + begin_byte, peer_msg.payload.begin() + 8, peer_msg.payload.end());
 		}
 	}
 
 	void verify_piece_hash(Piece_Info &piece)
 	{
-		std::cout << "DEBUG: " << piece.piece_data << "\n";
 		// calculate hash of downloaded piece
 		std::string downloaded_data_hash = Encoder::hast_to_hex(Encoder::SHA_string(piece.piece_data));
 
 		if (downloaded_data_hash != piece.piece_hash)
 			throw std::runtime_error("Hash of downloaded data doesn't match actual hash: " + downloaded_data_hash + " " + piece.piece_hash);
+
+		std::unique_lock<std::mutex> lock(queue_mutex);
+		std::cout << "Piece #" << piece.piece_index << " successfully downloaded!\n";
 	}
 
 }
+

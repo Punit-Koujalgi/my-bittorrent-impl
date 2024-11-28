@@ -9,7 +9,7 @@
 			"type": "cppdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/build/bittorrent",
-			"args": ["handshake", "/home/punit/Desktop/MyProjects/my-bit-torrent/sample.torrent", "188.119.61.177:6881"],
+			"args": ["download_piece", "-o", "/tmp/test-piece", "/home/punit/Desktop/MyProjects/my-bit-torrent/sample.torrent", "1"],
 			"stopAtEntry": false,
 			"environment": [],
 			"cwd": "${workspaceFolder}",

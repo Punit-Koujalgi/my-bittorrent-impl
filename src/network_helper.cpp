@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <chrono>
 
 #define BITTORRENT_PROTOCOL "BitTorrent protocol"
 #define PEER_ID "PUNITKOUJAPAVANKOUJA"
@@ -209,31 +210,27 @@ namespace Network
 		while (received_responses < expected_responses)
 		{
 			Peer_Msg peer_msg;
-
-			// receive total length bytes -> 4
-			std::string total_len_bytes(4, 0);
-			if (recv(peer_socket, total_len_bytes.data(), total_len_bytes.size(), 0) < 0)
-			{
-				std::cerr << "Incorrect response received\n";
-				break; // so we can return with whatever msgs we received correctly
-			}
+			std::vector<char> total_len_bytes(4);
+			read(peer_socket, total_len_bytes.data(), total_len_bytes.size());
 
 			auto total_len = Encoder::uint8_to_uint32(total_len_bytes[0], total_len_bytes[1], total_len_bytes[2], total_len_bytes[3]);
+			peer_msg.total_bytes = total_len;
+
+			// read message type
+			read(peer_socket, &peer_msg.msg_type, sizeof(peer_msg.msg_type));
+			--total_len;
 
 			// receive rest of the msg
-			std::string actual_msg(total_len, 0);
-			if (total_len > 1)
+			if (total_len > 0)
 			{
-				if (recv(peer_socket, actual_msg.data(), actual_msg.size(), 0) != actual_msg.size())
-				{
-					std::cerr << "Incorrect response received\n";
-					break; // so we can return with whatever msgs we received correctly
-				}
-				peer_msg.payload = actual_msg.substr(1);
-			}
+				std::string actual_msg(total_len, 0);
+				auto bytes_read = recv(peer_socket, actual_msg.data(), actual_msg.size(), 0);
 
-			peer_msg.total_bytes = total_len;
-			peer_msg.msg_type = actual_msg[0];
+				while (bytes_read != total_len)
+					bytes_read += recv(peer_socket, actual_msg.data() + bytes_read, total_len - bytes_read, 0);
+
+				peer_msg.payload = actual_msg;
+			}
 
 			peer_msgs.push_back(peer_msg);
 			++received_responses;
