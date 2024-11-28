@@ -1,5 +1,6 @@
 
 #include "bencode_helper.h"
+#include "network_helper.h"
 
 #include <fstream>
 
@@ -207,6 +208,20 @@ namespace Encoder
 		return encoded;
 	}
 
+	std::vector<uint8_t> uint32_to_uint8(uint32_t value)
+	{
+		auto result = std::vector<uint8_t>{};
+		result.emplace_back(value >> 24 & 0xFF);
+		result.emplace_back(value >> 16 & 0xFF);
+		result.emplace_back(value >> 8 & 0xFF);
+		result.emplace_back(value & 0xFF);
+		return result;
+	}
+
+	uint32_t uint8_to_uint32(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
+	{
+		return ((uint32_t)a << 24) | ((uint32_t)b << 16) | ((uint32_t)c << 8) | (uint32_t)d;
+	}
 
 }
 
@@ -234,6 +249,7 @@ namespace Torrent
 		torrent_data.info_hash = std::move(Encoder::SHA_string(info_hash));
 		torrent_data.piece_length = decoded_data["info"]["piece length"].get<int>();
 		torrent_data.piece_hashes = std::move(Decoder::get_pieces_list_from_json(decoded_data["info"]["pieces"]));
+		torrent_data.peers = Network::get_peers(torrent_data.info_hash, torrent_data.tracker, torrent_data.length);
 
 		return 0;
 	}

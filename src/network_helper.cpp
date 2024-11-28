@@ -1,5 +1,6 @@
 
 #include "network_helper.h"
+#include "bencode_helper.h"
 #include "lib/http/httplib.h"
 
 #include <sys/socket.h>
@@ -18,6 +19,17 @@ namespace Network
 	}
 
 	std::string Peer::value() { return this->ip_addr + ":" + this->port; }
+
+	std::string Peer_Msg::getMessage()
+	{
+		std::vector<uint8_t> vec_msg;
+		vec_msg.push_back(msg_type);
+
+		auto payload_size_bytes = Encoder::uint32_to_uint8(payload.size() > 0 ? payload.size() + 1 : 1);
+		vec_msg.insert(vec_msg.begin(), payload_size_bytes.begin(), payload_size_bytes.end());
+
+		return std::string(vec_msg.begin(), vec_msg.end());
+	}
 
 	std::tuple<std::string, std::string> split_domain_and_endpoint(const std::string& tracker_url)
 	{
@@ -47,21 +59,21 @@ namespace Network
 		return peers;
 	}
 
-	std::vector<Peer> get_peers(const Torrent::TorrentData& torrent_data)
+	std::vector<Peer> get_peers(const std::string& info_hash, const std::string& tracker, int length)
 	{
 		httplib::Params params{
 			{"peer_id", PEER_ID},
 			{"port", "6881"},
 			{"uploaded", "0"},
 			{"downloaded", "0"},
-			{"left", std::to_string(torrent_data.length)},
+			{"left", std::to_string(length)},
 			{"compact", "1"}
 		};
 
-		auto domain_and_endpoint = split_domain_and_endpoint(torrent_data.tracker);
+		auto domain_and_endpoint = split_domain_and_endpoint(tracker);
 		httplib::Headers headers{};
 
-		auto encoded_info_hash = Encoder::encode_info_hash(Encoder::hast_to_hex(torrent_data.info_hash));
+		auto encoded_info_hash = Encoder::encode_info_hash(Encoder::hast_to_hex(info_hash));
 
 		auto resp = httplib::Client(std::get<0>(domain_and_endpoint))
 				// By moving the info hash here we can avoid the url encoding of the query parameter.
@@ -128,7 +140,7 @@ namespace Network
 		return my_socket;
 	}
 
-	int receive_peer_id_with_handshake(const Torrent::TorrentData& torrent_data, const std::string& peer_addr_str, std::string& peer_id)
+	int receive_peer_id_with_handshake(const Torrent::TorrentData& torrent_data, const std::string& peer_addr_str, Peer& peer)
 	{
 		int my_socket = connect_with_peer(peer_addr_str);
 		if (my_socket < 0)
@@ -156,11 +168,69 @@ namespace Network
 
 		if (!handshake_resp.empty())
 		{
-			peer_id.assign(handshake_resp.end() - 20, handshake_resp.end());			
+			peer.peer_id.assign(handshake_resp.end() - 20, handshake_resp.end());			
+			peer.peer_socket = my_socket;
+
 			return 0;
 		}
 
 		return -1;
+	}
+
+	int send_peer_msgs(const int peer_socket, std::vector<Peer_Msg>& peer_msgs)
+	{
+		for (auto& peer_msg : peer_msgs)
+		{
+			std::string msg_to_send = peer_msg.getMessage();
+
+			if (send(peer_socket, msg_to_send.data(), msg_to_send.size(), 0) < 0)
+			{
+				std::cerr << "Failed to send data to peer" << std::endl;
+				return -1;
+			}
+		}
+
+		peer_msgs.clear();
+		return 0;
+	}
+
+	int receive_peer_msgs(const int peer_socket, std::vector<Peer_Msg>& peer_msgs)
+	{
+		peer_msgs.clear();
+
+		while (true)
+		{
+			Peer_Msg peer_msg;
+
+			// receive total length bytes -> 4
+			std::string total_len_bytes(4, 0);
+			if (recv(peer_socket, total_len_bytes.data(), total_len_bytes.size(), 0) <= 0)
+			{
+				std::cerr << "All responses received\n";
+				break; // so we can return with whatever msgs we received correctly
+			}
+
+			auto total_len = Encoder::uint8_to_uint32(total_len_bytes[0], total_len_bytes[1], total_len_bytes[2], total_len_bytes[3]);
+
+			// receive rest of the msg
+			std::string actual_msg(total_len, 0);
+			if (total_len > 1)
+			{
+				if (recv(peer_socket, actual_msg.data(), actual_msg.size(), 0) != actual_msg.size())
+				{
+					std::cerr << "Incorrect response received\n";
+					break; // so we can return with whatever msgs we received correctly
+				}
+				peer_msg.payload = actual_msg.substr(1);
+			}
+
+			peer_msg.total_bytes = total_len;
+			peer_msg.msg_type = actual_msg[0];
+
+			peer_msgs.push_back(peer_msg);
+		}
+
+		return 0;
 	}
 }
 

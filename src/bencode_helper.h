@@ -40,17 +40,28 @@ namespace Encoder
 
 	std::string encode_info_hash(const std::string& hash);
 
+	std::vector<uint8_t> uint32_to_uint8(uint32_t value);
+
+	uint32_t uint8_to_uint32(uint8_t a, uint8_t b, uint8_t c, uint8_t d);
+
+}
+
+namespace Network
+{
+	struct Peer;
 }
 
 namespace Torrent
 {
 	struct TorrentData
 	{
+		std::string out_file;
 		std::string tracker;
 		int length = 0;
 		std::string info_hash;
 		int piece_length = 0;
 		std::vector<std::string> piece_hashes;
+		std::vector<Network::Peer> peers;
 	};
 
 	int read_torrent_file(const std::string& torrent_file, TorrentData& torrent_data);

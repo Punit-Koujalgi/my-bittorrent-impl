@@ -41,14 +41,14 @@ int main(int argc, char *argv[])
 			std::cerr << "Failed to read torrent file: " << filename << std::endl;
 			return 1;
 		}
-		
+
 		std::cout << "Tracker URL: " << torrent_data.tracker << std::endl;
 		std::cout << "Length: " << torrent_data.length << std::endl;
 		std::cout << "Info Hash: " << Encoder::hast_to_hex(torrent_data.info_hash) << std::endl;
 		std::cout << "Piece Length: " << torrent_data.piece_length << std::endl;
 		std::cout << "Piece Hashes: " << std::endl;
 
-		for (const auto& hash : torrent_data.piece_hashes)
+		for (const auto &hash : torrent_data.piece_hashes)
 			std::cout << hash << std::endl;
 	}
 	else if (command == "peers")
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		auto peers = Network::get_peers(torrent_data);
+		auto peers = Network::get_peers(torrent_data.info_hash, torrent_data.tracker, torrent_data.length);
 
 		for (auto peer : peers)
 			std::cout << peer.value() << std::endl;
@@ -78,14 +78,36 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		std::string peer_id;
-		if (Network::receive_peer_id_with_handshake(torrent_data, argv[3], peer_id) != 0)
+		Network::Peer peer;
+		if (Network::receive_peer_id_with_handshake(torrent_data, argv[3], peer) != 0)
 		{
 			std::cerr << "Failed to receive peer id" << std::endl;
 			return 1;
 		}
 
-		std::cout << "Peer ID: " << Encoder::hast_to_hex(peer_id) << std::endl;
+		std::cout << "Peer ID: " << Encoder::hast_to_hex(peer.peer_id) << std::endl;
+	}
+	else if (command == "download_piece")
+	{
+		if (argc < 6)
+		{
+			std::cerr << "Redquired atleast 6 args for the command" << std::endl;
+			return 1;
+		}
+
+		Torrent::TorrentData torrent_data;
+
+		std::string torrent_file = argv[4];
+		int piece_index = std::stoi(argv[5]);
+
+		if (Torrent::read_torrent_file(torrent_file, torrent_data) != 0)
+		{
+			std::cerr << "Failed to read torrent file: " << torrent_file << std::endl;
+			return 1;
+		}
+
+		torrent_data.out_file = argv[3];
+		
 	}
 	else
 	{
@@ -95,4 +117,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
