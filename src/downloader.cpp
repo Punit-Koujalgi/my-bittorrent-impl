@@ -69,7 +69,6 @@ namespace Downloader
 
 	int initialize_thread_pool(int pool_size, const Torrent::TorrentData &torrent_data)
 	{
-		pool_size = 1; 
 		std::cout << "Creating " << pool_size << " threads in the pool..." << std::endl;
 
 		for (int peer_index = 0; peer_index < pool_size; ++peer_index)
@@ -78,7 +77,7 @@ namespace Downloader
 		return 0;
 	}
 
-	void *thread_function(const Torrent::TorrentData* torrent_data, int peer_index)
+	void thread_function(const Torrent::TorrentData* torrent_data, int peer_index)
 	{
 		while (true)
 		{
@@ -113,7 +112,6 @@ namespace Downloader
 		}
 
 		std::cout << "Thread #" << peer_index << " exiting...\n";
-		return nullptr;
 	}
 
 	int wait_for_download(const Torrent::TorrentData &torrent_data)
@@ -123,13 +121,31 @@ namespace Downloader
 			thread.join();
 
 		// piece data together and write to file
-		std::ofstream output_file(torrent_data.out_file, std::ios::binary);
+		std::ofstream output_file(torrent_data.out_file, std::ios::binary | std::ios::out);
+		if (!output_file.is_open())
+		{
+			std::cerr << "Failed to open output file: " << torrent_data.out_file << "\n";
+			return -1;
+		}
 		
 		while (!downloaded_piece_pq.empty())
 		{
 			auto piece = std::move(downloaded_piece_pq.top());
 			downloaded_piece_pq.pop();
-			output_file.write(piece.piece_data.c_str(), piece.piece_data.size());
+
+			// Read piece file and write to actual file
+			std::ifstream piece_file(piece.piece_file, std::ios::binary | std::ios::in);
+			if (!piece_file.is_open())
+			{
+				std::cerr << "Failed to open output file: " << piece.piece_file << "\n";
+				output_file.close();
+				return -1;
+			}
+
+			output_file << piece_file.rdbuf();
+
+			piece_file.close();
+			std::remove(piece.piece_file.c_str());
 		}
 
 		output_file.close();
@@ -181,7 +197,7 @@ namespace Downloader
 		handle_request_msgs(piece, peer);
 
 		if (piece.downloaded_len == piece.piece_len)
-			verify_piece_hash(piece);
+			verify_piece_hash(piece, torrent_data->out_file);
 	}
 
 	void handle_bitfield_msg(int peer_socket)
@@ -276,7 +292,7 @@ namespace Downloader
 		}
 	}
 
-	void verify_piece_hash(Piece_Info &piece)
+	void verify_piece_hash(Piece_Info &piece, const std::string& out_file)
 	{
 		// calculate hash of downloaded piece
 		std::string downloaded_data_hash = Encoder::hast_to_hex(Encoder::SHA_string(piece.piece_data));
@@ -284,7 +300,15 @@ namespace Downloader
 		if (downloaded_data_hash != piece.piece_hash)
 			throw std::runtime_error("Hash of downloaded data doesn't match actual hash: " + downloaded_data_hash + " " + piece.piece_hash);
 
-		std::unique_lock<std::mutex> lock(queue_mutex);
+		std::unique_lock<std::mutex> lock(queue_mutex); // use another mutex for output from threads
+
+		piece.piece_file = out_file + "_piece_" + std::to_string(piece.piece_index);
+
+		std::ofstream piece_file(piece.piece_file);
+		piece_file << std::move(piece.piece_data);
+		piece_file.close();
+
+		piece.piece_data.clear();
 		std::cout << "Piece #" << piece.piece_index << " successfully downloaded!\n";
 	}
 

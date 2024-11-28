@@ -33,7 +33,6 @@ namespace Network
 		uint64_t total_bytes = 0;
 		uint8_t msg_type;
 		std::string payload;
-		std::string full_message;
 
 		std::string getMessage();
 	};

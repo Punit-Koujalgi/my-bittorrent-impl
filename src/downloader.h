@@ -13,6 +13,7 @@ namespace Downloader
 		int downloaded_len = 0;
 		std::string piece_hash;
 		std::string piece_data;
+		std::string piece_file;
 	};
 
 	enum message_type
@@ -34,7 +35,7 @@ namespace Downloader
 
 	int wait_for_download(const Torrent::TorrentData &torrent_data);
 
-	void *thread_function(const Torrent::TorrentData* torrent_data, int peer_index);
+	void thread_function(const Torrent::TorrentData* torrent_data, int peer_index);
 
 	void populate_work_queue(const Torrent::TorrentData& torrent_data, int piece_index);
 
@@ -48,7 +49,7 @@ namespace Downloader
 
 	void handle_piece_msgs(Piece_Info& piece, Network::Peer &peer, int expected_responses);
 
-	void verify_piece_hash(Piece_Info& piece);
+	void verify_piece_hash(Piece_Info& piece, const std::string& out_file);
 }
 
 #endif
