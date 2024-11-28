@@ -222,6 +222,8 @@ namespace Downloader
 			peer_msg.payload.insert(peer_msg.payload.end(), block_length_bytes.begin(), block_length_bytes.end());
 
 			peer_msgs.push_back(peer_msg);
+
+			++requests_sent;
 			piece.downloaded_len += block_length;
 
 			if ((requests_sent != 0 && requests_sent % 5 == 0) || piece.downloaded_len == piece.piece_len)

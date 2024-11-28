@@ -31,8 +31,6 @@ namespace Network
 		auto payload_size_bytes = Encoder::uint32_to_uint8(vec_msg.size());
 		vec_msg.insert(vec_msg.begin(), payload_size_bytes.begin(), payload_size_bytes.end());
 
-		std::cout << "DEBUG: total bytes:" << vec_msg.size() << "\n";
-
 		return std::string(vec_msg.begin(), vec_msg.end());
 	}
 
