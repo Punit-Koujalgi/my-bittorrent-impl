@@ -30,7 +30,7 @@ namespace Downloader
 	std::priority_queue<Piece_Info, std::vector<Piece_Info>, piece_comparator> downloaded_piece_pq;
 	std::mutex pq_mutex;
 
-	int start_downloader(const Torrent::TorrentData &torrent_data, int piece_index)
+	int start_downloader(Torrent::TorrentData &torrent_data, int piece_index)
 	{
 		populate_work_queue(torrent_data, piece_index);
 
@@ -67,7 +67,7 @@ namespace Downloader
 		return 0;
 	}
 
-	int initialize_thread_pool(int pool_size, const Torrent::TorrentData &torrent_data)
+	int initialize_thread_pool(int pool_size, Torrent::TorrentData &torrent_data)
 	{
 		std::cout << "Creating " << pool_size << " threads in the pool..." << std::endl;
 
@@ -77,7 +77,7 @@ namespace Downloader
 		return 0;
 	}
 
-	void thread_function(const Torrent::TorrentData* torrent_data, int peer_index)
+	void thread_function(Torrent::TorrentData* torrent_data, int peer_index)
 	{
 		while (true)
 		{
@@ -175,7 +175,7 @@ namespace Downloader
 		std::cout << "Populated pieces work queue. Size: " << pieces_queue.size() << std::endl;
 	}
 
-	void download_piece(const Torrent::TorrentData *torrent_data, Piece_Info &piece, int peer_index)
+	void download_piece(Torrent::TorrentData *torrent_data, Piece_Info &piece, int peer_index)
 	{
 		piece.piece_data.clear(); // clear any previous half downloaded piece data
 		piece.downloaded_len = 0;
@@ -183,15 +183,18 @@ namespace Downloader
 
 		std::cout << "Downloading piece: " << piece.piece_index << " in Thread #" << peer_index << "\n";
 
-		auto peer = torrent_data->peers[peer_index];
-		if (Network::receive_peer_id_with_handshake(*torrent_data, peer.value(), peer) != 0)
-			throw std::runtime_error("Failed to connect to peer");
+		Network::Peer& peer = torrent_data->peers[peer_index];
+		if (peer.peer_socket == 0)
+		{
+			if (Network::receive_peer_id_with_handshake(*torrent_data, peer.value(), peer) != 0)
+				throw std::runtime_error("Failed to connect to peer");
 
-		// receive and skip bitfield
-		handle_bitfield_msg(peer.peer_socket);
+			// receive and skip bitfield
+			handle_bitfield_msg(peer.peer_socket);
 
-		// send interested and receive unchoke msg
-		handle_unchoke_msg(peer.peer_socket);
+			// send interested and receive unchoke msg
+			handle_unchoke_msg(peer.peer_socket);
+		}
 
 		// send request messages
 		handle_request_msgs(piece, peer);

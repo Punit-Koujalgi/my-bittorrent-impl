@@ -29,17 +29,17 @@ namespace Downloader
 		CANCEL
 	};
 
-	int start_downloader(const Torrent::TorrentData& torrent_data, int piece_index = -1); // -1 indicates download all pieces
+	int start_downloader(Torrent::TorrentData& torrent_data, int piece_index = -1); // -1 indicates download all pieces
 
-	int initialize_thread_pool(int pool_size, const Torrent::TorrentData &torrent_data);
+	int initialize_thread_pool(int pool_size, Torrent::TorrentData &torrent_data);
 
 	int wait_for_download(const Torrent::TorrentData &torrent_data);
 
-	void thread_function(const Torrent::TorrentData* torrent_data, int peer_index);
+	void thread_function(Torrent::TorrentData* torrent_data, int peer_index);
 
 	void populate_work_queue(const Torrent::TorrentData& torrent_data, int piece_index);
 
-	void download_piece(const Torrent::TorrentData* torrent_data, Piece_Info& piece_info, int peer_index);
+	void download_piece(Torrent::TorrentData* torrent_data, Piece_Info& piece_info, int peer_index);
 
 	void handle_bitfield_msg(int peer_socket);
 
