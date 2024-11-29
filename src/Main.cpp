@@ -146,7 +146,9 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			if (Magnet::receive_torrent_info(peer, torrent_data) != 0)
+			bool do_unchoke = command == "magnet_download_piece";
+
+			if (Magnet::receive_torrent_info(peer, torrent_data, do_unchoke) != 0)
 			{
 				std::cout << "Failed to receive torrent info from peer\n";
 				return 1;

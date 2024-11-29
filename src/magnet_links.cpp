@@ -120,7 +120,7 @@ namespace Magnet
 		return 0;
 	}
 
-	int receive_torrent_info(const Network::Peer& peer, Torrent::TorrentData& torrent_data)
+	int receive_torrent_info(const Network::Peer& peer, Torrent::TorrentData& torrent_data, bool do_unchoke)
 	{
 		std::string payload;
 		json req_dict = json::object();
@@ -141,7 +141,7 @@ namespace Magnet
 
 		size_t dict_size_offset = 1;
 		auto resp_dict = Decoder::decode_bencoded_dict(peer_msg.payload, dict_size_offset);
-		std::cout << resp_dict.dump() << " " << dict_size_offset << std::endl;
+
 		if (resp_dict["msg_type"] == 1)
 		{
 			auto metadata_dict = Decoder::decode_bencoded_value(peer_msg.payload.substr(dict_size_offset, resp_dict["total_size"]));
@@ -150,8 +150,11 @@ namespace Magnet
 			torrent_data.piece_length = metadata_dict["piece length"];
 			torrent_data.piece_hashes = std::move(Decoder::get_pieces_list_from_json(metadata_dict["pieces"]));
 
-			// send interested and receive unchoke msg
-			Downloader::handle_unchoke_msg(peer.peer_socket);
+			if (do_unchoke)
+			{
+				// send interested and receive unchoke msg
+				Downloader::handle_unchoke_msg(peer.peer_socket);
+			}
 
 			return 0;
 		}

@@ -25,7 +25,7 @@ namespace Magnet
 
 	int send_and_receive_peer_msg(int peer_socket, const std::string payload, Network::Peer_Msg& peer_msg);
 
-	int receive_torrent_info(const Network::Peer& peer, Torrent::TorrentData& torrent_data);
+	int receive_torrent_info(const Network::Peer& peer, Torrent::TorrentData& torrent_data, bool do_unchoke);
 }
 
 
