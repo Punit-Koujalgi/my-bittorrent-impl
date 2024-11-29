@@ -96,16 +96,22 @@ namespace Network
 		
 	}
 
-	void prepare_handshake(const std::string& hashinfo, std::string& handShake)
+	void prepare_handshake(const std::string& hashinfo, bool is_magnet_download, std::string& handShake)
 	{
 		char protocolLength = 19;
 		handShake.push_back(protocolLength);
 
 		std::string protocol = BITTORRENT_PROTOCOL;
 		handShake.insert(handShake.end(), protocol.begin(), protocol.end());
+
 		//eight reserved bytes
 		for (int i = 0; i < 8 ; ++i)
-			handShake.push_back(0);
+		{
+			if (is_magnet_download && i == 5)
+				handShake.push_back('\x10'); // 20th bit from the right
+			else	
+				handShake.push_back(0);
+		}
 
 		handShake.insert(handShake.end(), hashinfo.begin(), hashinfo.end());
 		std::string peerId = PEER_ID;
@@ -154,7 +160,7 @@ namespace Network
 		}
 
 		std::string handshake_msg;
-		prepare_handshake(torrent_data.info_hash, handshake_msg);
+		prepare_handshake(torrent_data.info_hash, torrent_data.is_magnet_download, handshake_msg);
 
 		if (send(my_socket, handshake_msg.data(), handshake_msg.size(), 0) < 0)
 		{

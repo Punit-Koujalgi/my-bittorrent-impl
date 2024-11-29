@@ -43,7 +43,7 @@ namespace Network
 
 	std::vector<Peer> process_peers_str(std::string&& encoded_peers);
 
-	void prepare_handshake(const std::string& hashinfo, std::string& handShake);
+	void prepare_handshake(const std::string& hashinfo, bool is_magnet_download, std::string& handShake);
 
 	int connect_with_peer(const std::string& peer_addr);
 

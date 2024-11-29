@@ -127,6 +127,22 @@ int main(int argc, char *argv[])
 		std::cout << "Tracker URL: " << torrent_data.tracker << std::endl;
 		std::cout << "Info Hash: " << Encoder::hash_to_hex(torrent_data.info_hash) << std::endl;
 	}
+	else if (command == "magnet_handshake")
+	{
+		Torrent::TorrentData torrent_data;
+		Magnet::parse_magnet_link(argv[2], torrent_data);
+
+		std::cout << "Got peers: " << torrent_data.peers.size() << "\n";
+
+		Network::Peer peer;
+		if (Network::receive_peer_id_with_handshake(torrent_data, torrent_data.peers[0].value(), peer) != 0)
+		{
+			std::cerr << "Failed to receive peer id" << std::endl;
+			return 1;
+		}
+
+		std::cout << "Peer ID: " << Encoder::hash_to_hex(peer.peer_id) << std::endl;
+	}
 	else
 	{
 		std::cerr << "unknown command: " << command << std::endl;

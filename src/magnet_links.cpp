@@ -1,6 +1,7 @@
 
 #include "magnet_links.h"
 #include "bencode_helper.h"
+#include "network_helper.h"
 
 #include <string_view>
 
@@ -42,6 +43,8 @@ namespace Magnet
 
 		} while (true);
 		
+		torrent_data.is_magnet_download = true;
+		torrent_data.peers = Network::get_peers(torrent_data.info_hash, torrent_data.tracker, 999);
 
 		return 0;
 	}

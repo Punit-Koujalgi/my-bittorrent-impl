@@ -64,6 +64,7 @@ namespace Torrent
 		int piece_length = 0;
 		std::vector<std::string> piece_hashes;
 		std::vector<Network::Peer> peers;
+		bool is_magnet_download = false;
 	};
 
 	int read_torrent_file(const std::string& torrent_file, TorrentData& torrent_data);
