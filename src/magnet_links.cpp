@@ -6,6 +6,8 @@
 
 #include <string_view>
 
+#define MY_PEER_EXTENSION_ID 19
+
 namespace Magnet
 {
 	int parse_magnet_link(const std::string& magnet_link, Torrent::TorrentData& torrent_data)
@@ -60,45 +62,98 @@ namespace Magnet
 		return false;
 	}
 
-	int get_peer_extension_id(Network::Peer& peer)
+	int send_and_receive_peer_msg(int peer_socket, const std::string payload, Network::Peer_Msg& peer_msg_resp)
 	{
-		// receive and skip bitfield
-		Downloader::handle_bitfield_msg(peer.peer_socket);
-
-		// Send extension handshake
+		// Send request to peer
 		Network::Peer_Msg peer_msg;
 
 		peer_msg.msg_type = 20;
-		peer_msg.payload.push_back(0); // extension handshake
-
-		json m_dict = json::object();
-		m_dict["m"] = json::object();
-		m_dict["m"]["ut_metadata"] = 19;
-
-		peer_msg.payload.append(Encoder::json_to_bencode(m_dict));
+		peer_msg.payload = std::move(payload);
 
 		std::vector<Network::Peer_Msg> peer_msgs;
 		peer_msgs.push_back(peer_msg);
 
-		if (Network::send_peer_msgs(peer.peer_socket, peer_msgs) != 0)
+		if (Network::send_peer_msgs(peer_socket, peer_msgs) != 0)
 		{
 			std::cout << "Failed to send extension handshake msg\n";
 			return -1;
 		}
 
-		if (Network::receive_peer_msgs(peer.peer_socket, peer_msgs, 1) != 0)
+		if (Network::receive_peer_msgs(peer_socket, peer_msgs, 1) != 0 || peer_msgs.size() < 1)
 		{
 			std::cout << "Failed to receive extension handshake msg\n";
 			return -1;
 		}
 
-		std::string bencoded_resp = peer_msgs[0].payload.substr(1);
+		peer_msg_resp = std::move(peer_msgs[0]);
+
+		return 0;
+	}
+
+	int get_peer_extension_id(Network::Peer& peer)
+	{
+		// receive and skip bitfield
+		Downloader::handle_bitfield_msg(peer.peer_socket);
+
+		// Send and receive extension handshake
+		std::string payload;
+		json m_dict = json::object();
+		m_dict["m"] = json::object();
+		m_dict["m"]["ut_metadata"] = MY_PEER_EXTENSION_ID; // my birthday :)
+
+		payload.push_back(0); // extension handshake
+		payload.append(Encoder::json_to_bencode(m_dict));
+
+		Network::Peer_Msg peer_msg;
+		if (send_and_receive_peer_msg(peer.peer_socket, payload, peer_msg) != 0)
+		{
+			std::cout << "Failed to perform handshake\n";
+			return -1;
+		}
+
+		std::string bencoded_resp = peer_msg.payload.substr(1);
 		auto m_dict_resp = Decoder::decode_bencoded_value(bencoded_resp);
 
 		peer.magnet_extension_id = m_dict_resp["m"]["ut_metadata"].get<int>();
 		std::cout << "Got peer extension Id: " << peer.magnet_extension_id << "\n";
 
 		return 0;
+	}
+
+	int receive_torrent_info(const Network::Peer& peer, Torrent::TorrentData& torrent_data)
+	{
+		std::string payload;
+		json req_dict = json::object();
+
+		req_dict["msg_type"] = 0;
+		req_dict["piece"] = 0;
+
+		payload.push_back(static_cast<uint8_t>(peer.magnet_extension_id));
+		payload.append(Encoder::json_to_bencode(req_dict));
+
+		Network::Peer_Msg peer_msg;
+		if (send_and_receive_peer_msg(peer.peer_socket, payload, peer_msg) != 0
+			|| (peer_msg.payload.size() < 1 || static_cast<int>(peer_msg.payload[0]) != MY_PEER_EXTENSION_ID))
+		{
+			std::cout << "Failed to receive torrent info\n";
+			return -1;
+		}
+
+		size_t dict_size_offset = 1;
+		auto resp_dict = Decoder::decode_bencoded_dict(peer_msg.payload, dict_size_offset);
+		std::cout << resp_dict.dump() << " " << dict_size_offset << std::endl;
+		if (resp_dict["msg_type"] == 1)
+		{
+			auto metadata_dict = Decoder::decode_bencoded_value(peer_msg.payload.substr(dict_size_offset, resp_dict["total_size"]));
+			
+			torrent_data.length = metadata_dict["length"];
+			torrent_data.piece_length = metadata_dict["piece length"];
+			torrent_data.piece_hashes = std::move(Decoder::get_pieces_list_from_json(metadata_dict["pieces"]));
+
+			return 0;
+		}
+
+		return -1;
 	}
 
 }

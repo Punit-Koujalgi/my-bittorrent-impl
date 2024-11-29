@@ -127,12 +127,10 @@ int main(int argc, char *argv[])
 		std::cout << "Tracker URL: " << torrent_data.tracker << std::endl;
 		std::cout << "Info Hash: " << Encoder::hash_to_hex(torrent_data.info_hash) << std::endl;
 	}
-	else if (command == "magnet_handshake")
+	else if (command == "magnet_handshake" || command == "magnet_info")
 	{
 		Torrent::TorrentData torrent_data;
 		Magnet::parse_magnet_link(argv[2], torrent_data);
-
-		std::cout << "Got peers: " << torrent_data.peers.size() << "\n";
 
 		Network::Peer peer;
 		if (Network::receive_peer_id_with_handshake(torrent_data, torrent_data.peers[0].value(), peer) != 0)
@@ -141,8 +139,28 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		std::cout << "Peer ID: " << Encoder::hash_to_hex(peer.peer_id) << std::endl;
-		std::cout << "Peer Metadata Extension ID: " << peer.magnet_extension_id << std::endl;
+		if (command == "magnet_handshake")
+		{
+			std::cout << "Peer ID: " << Encoder::hash_to_hex(peer.peer_id) << std::endl;
+			std::cout << "Peer Metadata Extension ID: " << peer.magnet_extension_id << std::endl;
+		}
+		else
+		{
+			if (Magnet::receive_torrent_info(peer, torrent_data) != 0)
+			{
+				std::cout << "Failed to receive torrent info from peer\n";
+				return 1;
+			}
+
+			std::cout << "Tracker URL: " << torrent_data.tracker << std::endl;
+			std::cout << "Length: " << torrent_data.length << std::endl;
+			std::cout << "Info Hash: " << Encoder::hash_to_hex(torrent_data.info_hash) << std::endl;
+			std::cout << "Piece Length: " << torrent_data.piece_length << std::endl;
+			std::cout << "Piece Hashes: " << std::endl;
+
+			for (const auto &hash : torrent_data.piece_hashes)
+				std::cout << hash << std::endl;
+		}
 	}
 	else
 	{
