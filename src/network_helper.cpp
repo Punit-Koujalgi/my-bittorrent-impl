@@ -77,7 +77,7 @@ namespace Network
 		auto domain_and_endpoint = split_domain_and_endpoint(tracker);
 		httplib::Headers headers{};
 
-		auto encoded_info_hash = Encoder::encode_info_hash(Encoder::hast_to_hex(info_hash));
+		auto encoded_info_hash = Encoder::encode_info_hash(Encoder::hash_to_hex(info_hash));
 
 		auto resp = httplib::Client(std::get<0>(domain_and_endpoint))
 				// By moving the info hash here we can avoid the url encoding of the query parameter.

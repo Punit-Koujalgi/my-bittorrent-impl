@@ -36,7 +36,9 @@ namespace Encoder
 
 	std::string SHA_string(const std::string& data);
 
-	std::string hast_to_hex(const std::string& hash);
+	std::string hash_to_hex(const std::string& hash);
+
+	std::string hex_to_hash(const std::string& hex);
 
 	std::string encode_info_hash(const std::string& hash);
 

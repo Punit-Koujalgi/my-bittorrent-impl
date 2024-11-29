@@ -298,7 +298,7 @@ namespace Downloader
 	void verify_piece_hash(Piece_Info &piece, const std::string& out_file)
 	{
 		// calculate hash of downloaded piece
-		std::string downloaded_data_hash = Encoder::hast_to_hex(Encoder::SHA_string(piece.piece_data));
+		std::string downloaded_data_hash = Encoder::hash_to_hex(Encoder::SHA_string(piece.piece_data));
 
 		if (downloaded_data_hash != piece.piece_hash)
 			throw std::runtime_error("Hash of downloaded data doesn't match actual hash: " + downloaded_data_hash + " " + piece.piece_hash);

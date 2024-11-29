@@ -5,6 +5,7 @@
 #include "bencode_helper.h"
 #include "network_helper.h"
 #include "downloader.h"
+#include "magnet_links.h"
 
 int main(int argc, char *argv[])
 {
@@ -45,7 +46,7 @@ int main(int argc, char *argv[])
 
 		std::cout << "Tracker URL: " << torrent_data.tracker << std::endl;
 		std::cout << "Length: " << torrent_data.length << std::endl;
-		std::cout << "Info Hash: " << Encoder::hast_to_hex(torrent_data.info_hash) << std::endl;
+		std::cout << "Info Hash: " << Encoder::hash_to_hex(torrent_data.info_hash) << std::endl;
 		std::cout << "Piece Length: " << torrent_data.piece_length << std::endl;
 		std::cout << "Piece Hashes: " << std::endl;
 
@@ -86,7 +87,7 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		std::cout << "Peer ID: " << Encoder::hast_to_hex(peer.peer_id) << std::endl;
+		std::cout << "Peer ID: " << Encoder::hash_to_hex(peer.peer_id) << std::endl;
 	}
 	else if (command == "download_piece" || command == "download")
 	{
@@ -117,6 +118,14 @@ int main(int argc, char *argv[])
 			std::cerr << "Failed to download torrent file: " << torrent_file << std::endl;
 			return 1;
 		}
+	}
+	else if (command == "magnet_parse")
+	{
+		Torrent::TorrentData torrent_data;
+		Magnet::parse_magnet_link(argv[2], torrent_data);
+
+		std::cout << "Tracker URL: " << torrent_data.tracker << std::endl;
+		std::cout << "Info Hash: " << Encoder::hash_to_hex(torrent_data.info_hash) << std::endl;
 	}
 	else
 	{

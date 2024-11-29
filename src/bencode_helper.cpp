@@ -189,7 +189,7 @@ namespace Encoder
 		return hash;
 	}
 
-	std::string hast_to_hex(const std::string& hash)
+	std::string hash_to_hex(const std::string& hash)
 	{
 		std::stringstream ss;
 		ss << std::hex << std::setfill('0');
@@ -198,6 +198,23 @@ namespace Encoder
 			ss << std::setw(2) << static_cast<int>(byte);
 
 		return ss.str();
+	}
+
+	std::string hex_to_hash(const std::string& hex)
+	{
+		std::string res;
+
+		for (int i = 0; i < hex.size(); i+=2)
+		{
+			std::stringstream ss;
+			ss << std::hex << hex.substr(i, 2);
+
+			uint32_t  val = 0; // uint32t first to interpret the value and then cast to uint8
+			ss >> val;
+			res.push_back(static_cast<uint8_t>(val));
+		}
+
+		return res;
 	}
 
 	std::string encode_info_hash(const std::string& hash)
