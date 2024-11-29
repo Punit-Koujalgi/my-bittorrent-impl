@@ -21,6 +21,7 @@ namespace Network
 		std::string ip_addr;
 		std::string port;
 		int peer_socket = 0;
+		int magnet_extension_id = 0;
 
 		Peer(UCHAR u1, UCHAR u2, UCHAR u3, UCHAR u4, unsigned short port);
 		Peer() = default;

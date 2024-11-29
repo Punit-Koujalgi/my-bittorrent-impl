@@ -2,6 +2,7 @@
 #include "magnet_links.h"
 #include "bencode_helper.h"
 #include "network_helper.h"
+#include "downloader.h"
 
 #include <string_view>
 
@@ -45,6 +46,57 @@ namespace Magnet
 		
 		torrent_data.is_magnet_download = true;
 		torrent_data.peers = Network::get_peers(torrent_data.info_hash, torrent_data.tracker, 999);
+
+		return 0;
+	}
+
+	bool is_extension_supported(const std::string& base_handshake)
+	{
+		std::string_view reserved_bits = base_handshake.substr(20, 8);
+
+		if (static_cast<uint8_t>(reserved_bits[5]) & (1 << 4))
+			return true;
+
+		return false;
+	}
+
+	int get_peer_extension_id(Network::Peer& peer)
+	{
+		// receive and skip bitfield
+		Downloader::handle_bitfield_msg(peer.peer_socket);
+
+		// Send extension handshake
+		Network::Peer_Msg peer_msg;
+
+		peer_msg.msg_type = 20;
+		peer_msg.payload.push_back(0); // extension handshake
+
+		json m_dict = json::object();
+		m_dict["m"] = json::object();
+		m_dict["m"]["ut_metadata"] = 19;
+
+		peer_msg.payload.append(Encoder::json_to_bencode(m_dict));
+
+		std::vector<Network::Peer_Msg> peer_msgs;
+		peer_msgs.push_back(peer_msg);
+
+		if (Network::send_peer_msgs(peer.peer_socket, peer_msgs) != 0)
+		{
+			std::cout << "Failed to send extension handshake msg\n";
+			return -1;
+		}
+
+		if (Network::receive_peer_msgs(peer.peer_socket, peer_msgs, 1) != 0)
+		{
+			std::cout << "Failed to receive extension handshake msg\n";
+			return -1;
+		}
+
+		std::string bencoded_resp = peer_msgs[0].payload.substr(1);
+		auto m_dict_resp = Decoder::decode_bencoded_value(bencoded_resp);
+
+		peer.magnet_extension_id = m_dict_resp["m"]["ut_metadata"].get<int>();
+		std::cout << "Got peer extension Id: " << peer.magnet_extension_id << "\n";
 
 		return 0;
 	}

@@ -142,6 +142,7 @@ int main(int argc, char *argv[])
 		}
 
 		std::cout << "Peer ID: " << Encoder::hash_to_hex(peer.peer_id) << std::endl;
+		std::cout << "Peer Metadata Extension ID: " << peer.magnet_extension_id << std::endl;
 	}
 	else
 	{

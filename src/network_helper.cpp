@@ -2,6 +2,8 @@
 #include "network_helper.h"
 #include "bencode_helper.h"
 #include "lib/http/httplib.h"
+#include "downloader.h"
+#include "magnet_links.h"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -180,6 +182,17 @@ namespace Network
 		{
 			peer.peer_id.assign(handshake_resp.end() - 20, handshake_resp.end());			
 			peer.peer_socket = my_socket;
+
+			if (torrent_data.is_magnet_download && Magnet::is_extension_supported(handshake_resp))
+			{
+				std::cout << "Handshake supported\n";
+				
+				if (Magnet::get_peer_extension_id(peer) != 0)
+				{
+					std::cerr << "Failed to get extension Id from peer" << std::endl;
+					return -1;
+				}
+			}
 
 			std::cout << "Successfully connected to peer: " << peer_addr_str << "\n";
 

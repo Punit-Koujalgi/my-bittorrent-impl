@@ -189,8 +189,11 @@ namespace Downloader
 			if (Network::receive_peer_id_with_handshake(*torrent_data, peer.value(), peer) != 0)
 				throw std::runtime_error("Failed to connect to peer");
 
-			// receive and skip bitfield
-			handle_bitfield_msg(peer.peer_socket);
+			if (not torrent_data->is_magnet_download)
+			{
+				// receive and skip bitfield
+				handle_bitfield_msg(peer.peer_socket);
+			}
 
 			// send interested and receive unchoke msg
 			handle_unchoke_msg(peer.peer_socket);
