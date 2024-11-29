@@ -127,10 +127,10 @@ int main(int argc, char *argv[])
 		std::cout << "Tracker URL: " << torrent_data.tracker << std::endl;
 		std::cout << "Info Hash: " << Encoder::hash_to_hex(torrent_data.info_hash) << std::endl;
 	}
-	else if (command == "magnet_handshake" || command == "magnet_info" || command == "magnet_download_piece")
+	else if (command == "magnet_handshake" || command == "magnet_info" || command == "magnet_download_piece" || command == "magnet_download")
 	{
 		Torrent::TorrentData torrent_data;
-		Magnet::parse_magnet_link(command == "magnet_download_piece" ? argv[4] : argv[2], torrent_data);
+		Magnet::parse_magnet_link(command == "magnet_download_piece" || command == "magnet_download" ? argv[4] : argv[2], torrent_data);
 
 		Network::Peer &peer = torrent_data.peers[0];
 		if (Network::receive_peer_id_with_handshake(torrent_data, peer.value(), peer) != 0)
@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			bool do_unchoke = command == "magnet_download_piece";
+			bool do_unchoke = (command == "magnet_download_piece" || command == "magnet_download");
 
 			if (Magnet::receive_torrent_info(peer, torrent_data, do_unchoke) != 0)
 			{
