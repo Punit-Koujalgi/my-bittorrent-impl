@@ -127,13 +127,13 @@ int main(int argc, char *argv[])
 		std::cout << "Tracker URL: " << torrent_data.tracker << std::endl;
 		std::cout << "Info Hash: " << Encoder::hash_to_hex(torrent_data.info_hash) << std::endl;
 	}
-	else if (command == "magnet_handshake" || command == "magnet_info")
+	else if (command == "magnet_handshake" || command == "magnet_info" || command == "magnet_download_piece")
 	{
 		Torrent::TorrentData torrent_data;
-		Magnet::parse_magnet_link(argv[2], torrent_data);
+		Magnet::parse_magnet_link(command == "magnet_download_piece" ? argv[4] : argv[2], torrent_data);
 
-		Network::Peer peer;
-		if (Network::receive_peer_id_with_handshake(torrent_data, torrent_data.peers[0].value(), peer) != 0)
+		Network::Peer &peer = torrent_data.peers[0];
+		if (Network::receive_peer_id_with_handshake(torrent_data, peer.value(), peer) != 0)
 		{
 			std::cerr << "Failed to receive peer id" << std::endl;
 			return 1;
@@ -152,14 +152,31 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 
-			std::cout << "Tracker URL: " << torrent_data.tracker << std::endl;
-			std::cout << "Length: " << torrent_data.length << std::endl;
-			std::cout << "Info Hash: " << Encoder::hash_to_hex(torrent_data.info_hash) << std::endl;
-			std::cout << "Piece Length: " << torrent_data.piece_length << std::endl;
-			std::cout << "Piece Hashes: " << std::endl;
+			if (command == "magnet_info")
+			{
+				std::cout << "Tracker URL: " << torrent_data.tracker << std::endl;
+				std::cout << "Length: " << torrent_data.length << std::endl;
+				std::cout << "Info Hash: " << Encoder::hash_to_hex(torrent_data.info_hash) << std::endl;
+				std::cout << "Piece Length: " << torrent_data.piece_length << std::endl;
+				std::cout << "Piece Hashes: " << std::endl;
 
-			for (const auto &hash : torrent_data.piece_hashes)
-				std::cout << hash << std::endl;
+				for (const auto &hash : torrent_data.piece_hashes)
+					std::cout << hash << std::endl;
+			}
+			else
+			{
+				int piece_index = -1; // download all pieces
+				if (command == "magnet_download_piece")
+					piece_index = std::stoi(argv[5]);
+
+				torrent_data.out_file = argv[3];
+
+				if (Downloader::start_downloader(torrent_data, piece_index) != 0)
+				{
+					std::cerr << "Failed to download magnet link!\n";
+					return 1;
+				}
+			}
 		}
 	}
 	else

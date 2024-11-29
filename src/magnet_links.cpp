@@ -150,6 +150,9 @@ namespace Magnet
 			torrent_data.piece_length = metadata_dict["piece length"];
 			torrent_data.piece_hashes = std::move(Decoder::get_pieces_list_from_json(metadata_dict["pieces"]));
 
+			// send interested and receive unchoke msg
+			Downloader::handle_unchoke_msg(peer.peer_socket);
+
 			return 0;
 		}
 
