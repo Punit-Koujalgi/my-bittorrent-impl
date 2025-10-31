@@ -8,4 +8,4 @@ set(CMAKE_CXX_STANDARD 23) # Enable the C++23 standard
 
 add_executable(bittorrent ${SOURCE_FILES})
 
-target_link_libraries(bittorrent -lcrypto)
+target_link_libraries(bittorrent -lcrypto) # sudo apt install libssl-dev On ubuntu for libcrypto.so and openssl include

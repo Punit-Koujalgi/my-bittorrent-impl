@@ -55,6 +55,12 @@ namespace Network
 
 namespace Torrent
 {
+	struct FileInfo
+	{
+		std::vector<std::string> path;  // path components for the file
+		int length;                     // length of this specific file
+	};
+
 	struct TorrentData
 	{
 		std::string out_file;
@@ -65,6 +71,11 @@ namespace Torrent
 		std::vector<std::string> piece_hashes;
 		std::vector<Network::Peer> peers;
 		bool is_magnet_download = false;
+		
+		// Multi-file torrent support
+		bool is_multi_file = false;
+		std::vector<FileInfo> files;  // list of files in multi-file torrent
+		std::string name;             // torrent name (directory name for multi-file)
 	};
 
 	int read_torrent_file(const std::string& torrent_file, TorrentData& torrent_data);

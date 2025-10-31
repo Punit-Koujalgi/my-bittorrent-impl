@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <queue>
 #include <fstream>
+#include <filesystem>
 #include <assert.h>
 
 #define BLOCK_SIZE_FOR_PIECE (16 * 1024)
@@ -114,13 +115,90 @@ namespace Downloader
 		std::cout << "Thread #" << peer_index << " exiting...\n";
 	}
 
+	int write_multi_file_torrent(const Torrent::TorrentData &torrent_data)
+	{
+		// Create base directory if specified
+		std::string base_path = torrent_data.out_file;
+		if (torrent_data.is_multi_file && !torrent_data.name.empty()) {
+			base_path = torrent_data.out_file + "/" + torrent_data.name;
+			std::filesystem::create_directories(base_path);
+		}
+
+		// Collect all piece data in order
+		std::vector<std::string> all_data;
+		all_data.resize(torrent_data.piece_hashes.size());
+		
+		while (!downloaded_piece_pq.empty()) {
+			auto piece = std::move(downloaded_piece_pq.top());
+			downloaded_piece_pq.pop();
+
+			// Read piece data
+			std::ifstream piece_file(piece.piece_file, std::ios::binary);
+			if (!piece_file.is_open()) {
+				std::cerr << "Failed to open piece file: " << piece.piece_file << "\n";
+				return -1;
+			}
+			
+			std::string piece_data((std::istreambuf_iterator<char>(piece_file)),
+			                       std::istreambuf_iterator<char>());
+			all_data[piece.piece_index] = std::move(piece_data);
+			
+			piece_file.close();
+			std::remove(piece.piece_file.c_str());
+		}
+
+		// Concatenate all piece data
+		std::string complete_data;
+		for (const auto& piece_data : all_data) {
+			complete_data += piece_data;
+		}
+
+		// Write data to individual files
+		size_t data_offset = 0;
+		for (const auto& file_info : torrent_data.files) {
+			// Build file path
+			std::string file_path = base_path;
+			for (const auto& path_component : file_info.path) {
+				file_path += "/" + path_component;
+			}
+			
+			// Create directory structure
+			std::filesystem::create_directories(std::filesystem::path(file_path).parent_path());
+			
+			// Write file data
+			std::ofstream output_file(file_path, std::ios::binary);
+			if (!output_file.is_open()) {
+				std::cerr << "Failed to create file: " << file_path << "\n";
+				return -1;
+			}
+			
+			if (data_offset + file_info.length <= complete_data.size()) {
+				output_file.write(complete_data.data() + data_offset, file_info.length);
+				data_offset += file_info.length;
+			} else {
+				std::cerr << "Error: Not enough data for file " << file_path << "\n";
+				return -1;
+			}
+			
+			output_file.close();
+			std::cout << "Created file: " << file_path << " (" << file_info.length << " bytes)\n";
+		}
+
+		return 0;
+	}
+
 	int wait_for_download(const Torrent::TorrentData &torrent_data)
 	{
 
 		for (auto& thread : thread_pool)
 			thread.join();
 
-		// piece data together and write to file
+		// Handle multi-file torrents differently
+		if (torrent_data.is_multi_file) {
+			return write_multi_file_torrent(torrent_data);
+		}
+
+		// Original single-file logic
 		std::ofstream output_file(torrent_data.out_file, std::ios::binary | std::ios::out);
 		if (!output_file.is_open())
 		{
@@ -198,7 +276,7 @@ namespace Downloader
 			// send interested and receive unchoke msg
 			handle_unchoke_msg(peer.peer_socket);
 		}
-
+		std::cout << "Peer connected for piece #" << piece.piece_index << "\n";
 		// send request messages
 		handle_request_msgs(piece, peer);
 

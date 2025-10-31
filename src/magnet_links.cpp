@@ -33,7 +33,10 @@ namespace Magnet
 			if (curr_key == "tr")
 			{
 				std::string curr_val_str(curr_val);
-				curr_val_str.replace(curr_val_str.find("%3A"), 3, ":");
+				// Decode %3A to :
+				while (curr_val_str.find("%3A") != std::string::npos)
+					curr_val_str.replace(curr_val_str.find("%3A"), 3, ":");
+				// Decode %2F to /
 				while (curr_val_str.find("%2F") != std::string::npos)
 					curr_val_str.replace(curr_val_str.find("%2F"), 3, "/");
 

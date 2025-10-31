@@ -10,16 +10,14 @@ namespace Decoder
 	{
 		size_t position = 0;
 
-		try
-		{
-			return decode_bencoded_value(encoded_value, position);
-		}
-		catch(const std::exception& e)
-		{
-			std::cerr << "Failed to decode string: [" << encoded_value << "]\n";
-		}
-
-		return json();
+	try
+	{
+		return decode_bencoded_value(encoded_value, position);
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << "Failed to decode string: [" << encoded_value << "]\n";
+	}		return json();
 	}
 
 	json decode_bencoded_value(const std::string &encoded_value, size_t& position)
@@ -261,13 +259,63 @@ namespace Torrent
 		std::string bencoded_info = Encoder::json_to_bencode(decoded_data["info"]);
 		std::string info_hash = (bencoded_info);
 
+		if (decoded_data.contains("announce") && decoded_data["announce"].is_string()) {
 		torrent_data.tracker = decoded_data["announce"].get<std::string>();
-		torrent_data.length = decoded_data["info"]["length"].get<int>();
-		torrent_data.info_hash = std::move(Encoder::SHA_string(info_hash));
-		torrent_data.piece_length = decoded_data["info"]["piece length"].get<int>();
-		torrent_data.piece_hashes = std::move(Decoder::get_pieces_list_from_json(decoded_data["info"]["pieces"]));
+	} else {
+		std::cerr << "Warning: No announce field found in torrent" << std::endl;
+		torrent_data.tracker = ""; // Empty tracker
+	}
+		
+		nlohmann::json info_dict = decoded_data["info"];
+	
+	// Get torrent name
+	if (info_dict.contains("name") && info_dict["name"].is_string() && !info_dict["name"].is_null()) {
+		torrent_data.name = info_dict["name"].get<std::string>();
+	}
+	
+	// Handle both single-file and multi-file torrents
+	if (info_dict.contains("length")) {
+		// Single-file torrent
+		torrent_data.is_multi_file = false;
+		torrent_data.length = info_dict["length"];
+	} else if (info_dict.contains("files")) {
+		// Multi-file torrent
+		torrent_data.is_multi_file = true;
+		torrent_data.length = 0;
+		
+		for (const auto& file : info_dict["files"]) {
+			if (file.contains("length") && file.contains("path")) {
+				FileInfo file_info;
+				file_info.length = file["length"].get<int>();
+				
+				// Extract path components with safety checks
+				if (file["path"].is_array()) {
+					for (const auto& path_component : file["path"]) {
+						if (path_component.is_string() && !path_component.is_null()) {
+							file_info.path.push_back(path_component.get<std::string>());
+						} else {
+							std::cerr << "Warning: Invalid path component in torrent file" << std::endl;
+						}
+					}
+				}
+				
+				torrent_data.files.push_back(file_info);
+				torrent_data.length += file_info.length;
+			}
+		}
+	} else {
+		throw std::runtime_error("Torrent file missing both 'length' and 'files' fields");
+	}
+	torrent_data.info_hash = std::move(Encoder::SHA_string(info_hash));
+	torrent_data.piece_length = info_dict["piece length"];
+	torrent_data.piece_hashes = std::move(Decoder::get_pieces_list_from_json(decoded_data["info"]["pieces"]));
+	
+	if (!torrent_data.tracker.empty()) {
 		torrent_data.peers = Network::get_peers(torrent_data.info_hash, torrent_data.tracker, torrent_data.length);
+	} else {
+		std::cerr << "Warning: No tracker, skipping peer discovery" << std::endl;
+	}
 
-		return 0;
+	return 0;
 	}
 }

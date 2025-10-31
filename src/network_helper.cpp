@@ -85,17 +85,27 @@ namespace Network
 				// By moving the info hash here we can avoid the url encoding of the query parameter.
 				.Get(std::get<1>(domain_and_endpoint) + "?info_hash=" + encoded_info_hash, params, headers);
 
-		auto resp_json = Decoder::decode_bencoded_value(resp->body);//["peers"].get<std::string>();
+		if (!resp) {
+			std::cerr << "Failed to connect to tracker: " << tracker << std::endl;
+			return std::vector<Peer>();
+		}
+
+		auto resp_json = Decoder::decode_bencoded_value(resp->body);
 		
-		if (resp_json["failure reason"].empty())
+		if (resp_json.contains("failure reason") && !resp_json["failure reason"].empty())
+		{
+			std::cerr << "Tracker request failed with err: " << resp_json["failure reason"].get<std::string>() << std::endl;
+			return std::vector<Peer>();
+		}
+		
+		if (resp_json.contains("peers"))
 		{
 			auto peers_str = resp_json["peers"].get<std::string>();
 			return process_peers_str(std::move(peers_str));
 		}
 		
-		std::cerr << "Tracker request failed with err: " << resp_json["failure reason"].get<std::string>() << std::endl;
+		std::cerr << "No peers found in tracker response" << std::endl;
 		return std::vector<Peer>();
-		
 	}
 
 	void prepare_handshake(const std::string& hashinfo, bool is_magnet_download, std::string& handShake)
@@ -143,12 +153,13 @@ namespace Network
 			return -1;
 		}
 
+		std::cout << "Connecting to peer: " << peer_addr_str << "\n";
 		if (connect(my_socket, (struct sockaddr*)&peer_addr, sizeof(peer_addr)) < 0)
 		{
 			std::cerr << "Failed to connect to peer" << std::endl;
 			return -1;
 		}
-
+		std::cout << "Success connected to peer: " << peer_addr_str << "\n";
 		return my_socket;
 	}
 

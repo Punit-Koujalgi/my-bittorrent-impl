@@ -52,6 +52,42 @@ int main(int argc, char *argv[])
 
 		for (const auto &hash : torrent_data.piece_hashes)
 			std::cout << hash << std::endl;
+		
+		// Display file information
+		if (torrent_data.is_multi_file) {
+			std::cout << "\nTorrent Type: Multi-file" << std::endl;
+			std::cout << "Torrent Name: " << torrent_data.name << std::endl;
+			std::cout << "Files (" << torrent_data.files.size() << "):" << std::endl;
+			
+			for (size_t i = 0; i < torrent_data.files.size(); ++i) {
+				const auto& file = torrent_data.files[i];
+				std::cout << "  [" << i + 1 << "] ";
+				
+				// Build full path
+				for (size_t j = 0; j < file.path.size(); ++j) {
+					if (j > 0) std::cout << "/";
+					std::cout << file.path[j];
+				}
+				
+				std::cout << " (" << file.length << " bytes)" << std::endl;
+			}
+		} else {
+			std::cout << "\nTorrent Type: Single-file" << std::endl;
+			if (!torrent_data.name.empty()) {
+				std::cout << "File Name: " << torrent_data.name << std::endl;
+			}
+		}
+		
+		// Display peer information
+		std::cout << "\nPeers:" << std::endl;
+		if (torrent_data.peers.empty()) {
+			std::cout << "  No peers found" << std::endl;
+		} else {
+			std::cout << "  Found " << torrent_data.peers.size() << " peer(s):" << std::endl;
+			for (size_t i = 0; i < torrent_data.peers.size(); ++i) {
+				std::cout << "  [" << i + 1 << "] " << torrent_data.peers[i].value() << std::endl;
+			}
+		}
 	}
 	else if (command == "peers")
 	{
@@ -132,6 +168,11 @@ int main(int argc, char *argv[])
 		Torrent::TorrentData torrent_data;
 		Magnet::parse_magnet_link(command == "magnet_download_piece" || command == "magnet_download" ? argv[4] : argv[2], torrent_data);
 
+		if (torrent_data.peers.empty()) {
+			std::cerr << "No peers found for magnet link" << std::endl;
+			return 1;
+		}
+
 		Network::Peer &peer = torrent_data.peers[0];
 		if (Network::receive_peer_id_with_handshake(torrent_data, peer.value(), peer) != 0)
 		{
@@ -171,7 +212,14 @@ int main(int argc, char *argv[])
 				if (command == "magnet_download_piece")
 					piece_index = std::stoi(argv[5]);
 
-				torrent_data.out_file = argv[3];
+				// Handle -o flag for output file
+				if (command == "magnet_download" || command == "magnet_download_piece") {
+					if (argc > 3 && std::string(argv[2]) == "-o") {
+						torrent_data.out_file = argv[3];
+					} else {
+						torrent_data.out_file = argv[3]; // fallback
+					}
+				}
 
 				if (Downloader::start_downloader(torrent_data, piece_index) != 0)
 				{
