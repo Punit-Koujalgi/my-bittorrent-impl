@@ -10,14 +10,16 @@ namespace Decoder
 	{
 		size_t position = 0;
 
-	try
-	{
-		return decode_bencoded_value(encoded_value, position);
-	}
-	catch (const std::exception& e)
-	{
-		std::cerr << "Failed to decode string: [" << encoded_value << "]\n";
-	}		return json();
+		try
+		{
+			return decode_bencoded_value(encoded_value, position);
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "Failed to decode string: [" << encoded_value << "]\n";
+		}
+		
+		return json();
 	}
 
 	json decode_bencoded_value(const std::string &encoded_value, size_t& position)
