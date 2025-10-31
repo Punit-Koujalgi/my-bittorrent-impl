@@ -338,7 +338,7 @@ def create_ui():
 					)
 					download_magnet_btn = gr.Button(
 						"🧲 Download from Magnet", 
-						variant="secondary",
+						variant="primary",
 						elem_classes=["download-btn"]
 					)
 				
