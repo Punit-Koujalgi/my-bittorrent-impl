@@ -31,18 +31,24 @@ def get_torrent_files():
 	torrent_files = list(project_root.glob("*.torrent"))
 	return [str(f.name) for f in torrent_files]
 
+def get_binary_path():
+	"""Get the absolute path to the bittorrent binary"""
+	return Path(__file__).parent / "bittorrent"
+
 def make_binary_executable():
 	"""Ensure the bittorrent binary has execute permissions"""
-	binary_path = Path(__file__).parent / "bittorrent"
+	import stat
+	binary_path = get_binary_path()
 	if binary_path.exists():
-		os.chmod(binary_path, 0o755)
+		current_permissions = os.stat(binary_path).st_mode
+		os.chmod(binary_path, current_permissions | stat.S_IEXEC)
 		return True
 	return False
 
 def run_command(cmd, cwd=None):
 	"""Run a command and return the output"""
 	try:
-		result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=cwd)
+		result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, shell=True)
 		return result.returncode, result.stdout, result.stderr
 	except Exception as e:
 		return 1, "", str(e)
@@ -50,16 +56,17 @@ def run_command(cmd, cwd=None):
 def get_torrent_info(torrent_file_path=None, magnet_link=None):
 	"""Get info about torrent file or magnet link"""
 	ui_dir = Path(__file__).parent
+	binary_path = get_binary_path()
 	
 	if not make_binary_executable():
 		return "❌ Error: BitTorrent binary not found or cannot be made executable"
 	
 	if torrent_file_path:
 		# For torrent files
-		cmd = f"./bittorrent info '{torrent_file_path}'"
+		cmd = f"'{binary_path}' info '{torrent_file_path}'"
 	elif magnet_link:
 		# For magnet links
-		cmd = f"./bittorrent magnet_info '{magnet_link}'"
+		cmd = f"'{binary_path}' magnet_info '{magnet_link}'"
 	else:
 		return "❌ No torrent file or magnet link provided"
 	
@@ -77,6 +84,7 @@ def download_content(torrent_file_path=None, magnet_link=None, progress=gr.Progr
 	global current_process, log_content
 	
 	ui_dir = Path(__file__).parent
+	binary_path = get_binary_path()
 	downloaded_file = ui_dir / "downloaded_file.gif"  # Use absolute path
 
 	# Remove existing download file if it exists
@@ -93,10 +101,10 @@ def download_content(torrent_file_path=None, magnet_link=None, progress=gr.Progr
 	
 	# Prepare command
 	if torrent_file_path:
-		cmd = f"./bittorrent download -o {downloaded_file} '{torrent_file_path}'"
+		cmd = f"'{binary_path}' download -o {downloaded_file} '{torrent_file_path}'"
 		log_content.append(f"📥 Starting download from torrent file: {os.path.basename(torrent_file_path)}")
 	elif magnet_link:
-		cmd = f"./bittorrent magnet_download -o {downloaded_file} '{magnet_link}'"
+		cmd = f"'{binary_path}' magnet_download -o {downloaded_file} '{magnet_link}'"
 		log_content.append(f"🧲 Starting download from magnet link")
 	else:
 		return "❌ No torrent file or magnet link provided", "", None, False
@@ -303,7 +311,7 @@ def create_ui():
 					preset_magnet = gr.Dropdown(
 						choices=magnet_choices,
 						value="Select a magnet link...",
-						label="📋 Preset Magnet Links"
+						label="📋 Some Magnet Links.."
 					)
 					
 					custom_magnet = gr.Textbox(
@@ -321,7 +329,7 @@ def create_ui():
 					preset_torrent = gr.Dropdown(
 						choices=torrent_choices,
 						value="Select a torrent file...",
-						label="📋 Preset Torrent Files"
+						label="📋 Some Torrent Files.."
 					)
 					
 					uploaded_torrent = gr.File(
@@ -360,7 +368,9 @@ def create_ui():
 					file_status = gr.Textbox(
 						label="📄 File Status",
 						interactive=False,
-						elem_classes=["info-box"]
+						elem_classes=["info-box"],
+						autoscroll=False,
+						lines=2
 					)
 					
 					info_display = gr.Textbox(

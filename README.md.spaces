@@ -1,0 +1,10 @@
+---
+title: my-bittorrent-impl
+app_file: ui/main.py
+sdk: gradio
+sdk_version: 5.49.1
+python_version: 3.12
+header: mini
+emoji: 🔥
+short_description: 'BitTorrent Client: Download torrent files and magnets!'
+---

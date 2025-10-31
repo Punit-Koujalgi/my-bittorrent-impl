@@ -205,6 +205,42 @@ int main(int argc, char *argv[])
 
 				for (const auto &hash : torrent_data.piece_hashes)
 					std::cout << hash << std::endl;
+				
+				// Display file information
+				if (torrent_data.is_multi_file) {
+					std::cout << "\nTorrent Type: Multi-file" << std::endl;
+					std::cout << "Torrent Name: " << torrent_data.name << std::endl;
+					std::cout << "Files (" << torrent_data.files.size() << "):" << std::endl;
+					
+					for (size_t i = 0; i < torrent_data.files.size(); ++i) {
+						const auto& file = torrent_data.files[i];
+						std::cout << "  [" << i + 1 << "] ";
+						
+						// Build full path
+						for (size_t j = 0; j < file.path.size(); ++j) {
+							if (j > 0) std::cout << "/";
+							std::cout << file.path[j];
+						}
+						
+						std::cout << " (" << file.length << " bytes)" << std::endl;
+					}
+				} else {
+					std::cout << "\nTorrent Type: Single-file" << std::endl;
+					if (!torrent_data.name.empty()) {
+						std::cout << "File Name: " << torrent_data.name << std::endl;
+					}
+				}
+				
+				// Display peer information
+				std::cout << "\nPeers:" << std::endl;
+				if (torrent_data.peers.empty()) {
+					std::cout << "  No peers found" << std::endl;
+				} else {
+					std::cout << "  Found " << torrent_data.peers.size() << " peer(s):" << std::endl;
+					for (size_t i = 0; i < torrent_data.peers.size(); ++i) {
+						std::cout << "  [" << i + 1 << "] " << torrent_data.peers[i].value() << std::endl;
+					}
+				}
 			}
 			else
 			{
